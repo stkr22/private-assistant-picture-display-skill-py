@@ -1,0 +1,1 @@
+"""Skill to dynamically display images from various sources via external agents."""
