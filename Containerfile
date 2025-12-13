@@ -7,7 +7,7 @@ ENV UV_LINK_MODE=copy \
     PYTHONUNBUFFERED=1
 
 # Install uv.
-COPY --from=ghcr.io/astral-sh/uv:0.9.11@sha256:5aa820129de0a600924f166aec9cb51613b15b68f1dcd2a02f31a500d2ede568 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.9.17@sha256:5cb6b54d2bc3fe2eb9a8483db958a0b9eebf9edff68adedb369df8e7b98711a2 /uv /uvx /bin/
 
 # Set working directory
 WORKDIR /app
