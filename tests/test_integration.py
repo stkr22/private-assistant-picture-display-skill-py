@@ -473,6 +473,4 @@ class TestAutomaticRotation:
 
         assert command_received, "Did not receive DisplayCommand within timeout"
         # The next image (never displayed) should be selected
-        assert received_image_id == str(next_image_id), (
-            f"Expected image {next_image_id}, got {received_image_id}"
-        )
+        assert received_image_id == str(next_image_id), f"Expected image {next_image_id}, got {received_image_id}"

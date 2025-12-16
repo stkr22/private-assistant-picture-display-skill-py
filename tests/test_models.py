@@ -1,5 +1,6 @@
 """Tests for database models."""
 
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from private_assistant_picture_display_skill.models.commands import (
@@ -51,11 +52,14 @@ class TestDeviceDisplayStateModel:
     def test_display_state_defaults(self) -> None:
         """Test display state default values."""
         device_id = uuid4()
+        before = datetime.now()
         state = DeviceDisplayState(global_device_id=device_id)
+        after = datetime.now()
         assert state.is_online is True  # default
         assert state.current_image_id is None
         assert state.displayed_since is None
-        assert state.scheduled_next_at is None
+        # scheduled_next_at defaults to now for immediate scheduling
+        assert before <= state.scheduled_next_at <= after
 
 
 class TestCommandModels:
