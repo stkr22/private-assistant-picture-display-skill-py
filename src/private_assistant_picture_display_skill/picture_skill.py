@@ -532,8 +532,7 @@ class PictureSkill(BaseSkill):
             query = (
                 select(DeviceDisplayState)
                 .where(DeviceDisplayState.is_online == True)  # noqa: E712
-                .where(DeviceDisplayState.scheduled_next_at.is_not(None))  # type: ignore[union-attr]
-                .where(DeviceDisplayState.scheduled_next_at <= now)  # type: ignore[operator]
+                .where(DeviceDisplayState.scheduled_next_at <= now)
             )
             result = await session.exec(query)
             due_states = result.all()

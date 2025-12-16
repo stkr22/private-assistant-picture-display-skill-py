@@ -27,4 +27,4 @@ class DeviceDisplayState(SQLModel, table=True):
     is_online: bool = Field(default=True, description="Whether device is currently reachable")
     current_image_id: UUID | None = Field(default=None, foreign_key="images.id")
     displayed_since: datetime | None = Field(default=None, description="When current image was displayed")
-    scheduled_next_at: datetime | None = Field(default=None, description="Scheduled time for next image")
+    scheduled_next_at: datetime = Field(default_factory=datetime.now, description="Scheduled time for next image")

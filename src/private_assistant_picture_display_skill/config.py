@@ -17,10 +17,10 @@ class DeviceMqttConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="DEVICE_MQTT_")
 
-    host: str = Field(default="localhost", description="Device MQTT broker host")
-    port: int = Field(default=1883, description="Device MQTT broker port")
-    username: str = Field(default="", description="Device MQTT username for authentication")
-    password: str = Field(default="", description="Device MQTT password for authentication")
+    host: str = Field(description="Device MQTT broker host")
+    port: int = Field(description="Device MQTT broker port")
+    username: str = Field(description="Device MQTT username for authentication")
+    password: str = Field(description="Device MQTT password for authentication")
 
 
 class MinioConfig(BaseSettings):
@@ -36,11 +36,11 @@ class MinioConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="MINIO_")
 
-    endpoint: str = Field(default="localhost:9000", description="MinIO server endpoint")
+    endpoint: str = Field(description="MinIO server endpoint")
     bucket: str = Field(default="inky-images", description="Bucket for image storage")
     secure: bool = Field(default=False, description="Use HTTPS for MinIO connection")
-    reader_access_key: str = Field(default="", description="Access key for device read access")
-    reader_secret_key: str = Field(default="", description="Secret key for device read access")
+    reader_access_key: str = Field(description="Access key for device read access")
+    reader_secret_key: str = Field(description="Secret key for device read access")
 
 
 class PictureSkillConfig(SkillConfig):
