@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from datetime import datetime
-from uuid import UUID
+from typing import TYPE_CHECKING
 
-import aiomqtt
 import jinja2
 from private_assistant_commons import BaseSkill, IntentRequest, IntentType
 from private_assistant_commons.database.models import GlobalDevice
 from pydantic import ValidationError
-from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+if TYPE_CHECKING:
+    import logging
+    from uuid import UUID
+
+    import aiomqtt
+    from sqlalchemy.ext.asyncio import AsyncEngine
 
 from private_assistant_picture_display_skill.config import DeviceMqttConfig, MinioConfig, PictureSkillConfig
 from private_assistant_picture_display_skill.models.commands import (
@@ -43,7 +47,7 @@ class PictureSkill(BaseSkill):
     # Class attribute for rotation check interval (seconds) - can be overridden in tests
     rotation_check_interval: int = 30
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         config_obj: PictureSkillConfig,
         mqtt_client: aiomqtt.Client,
