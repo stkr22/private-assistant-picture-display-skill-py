@@ -32,6 +32,10 @@ COPY --from=build-python /app /app
 
 ENV PATH="/app/.venv/bin:$PATH"
 # Set the user to 'appuser'
+<<<<<<< before updating
 USER appuser
 
 CMD ["private-assistant-picture-display-skill"]
+=======
+USER appuser
+>>>>>>> after updating
