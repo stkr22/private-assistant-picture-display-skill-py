@@ -29,7 +29,7 @@ def sample_image() -> Image:
         author="Test Author",
         original_width=1600,
         original_height=1200,
-        fetched_at=datetime.now(),
+        created_at=datetime.now(),
     )
 
 
