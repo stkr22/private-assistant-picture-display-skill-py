@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.1.0...v0.2.0) (2026-01-01)
+
+
+### Features
+
+* :lock: require explicit config values, remove unsafe defaults ([e621ac0](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/e621ac02323a4168ceb1b759703da8117415f563))
+* :sparkles: add tags, created_at, updated_at to Image model [AI] ([0998c34](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/0998c34fb28fec267c81e79e0eec964371d3d39b)), closes [#32](https://github.com/stkr22/private-assistant-picture-display-skill-py/issues/32)
+* :wrench: add pydantic mypy plugin for settings validation [AI] ([79aeef6](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/79aeef690be8baf022ac3c44f290d6f7de342332))
+* add tags, created_at, updated_at fields to Image model ([4a0b47b](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/4a0b47b8df897095a53cca073bba2681cc0b9bda))
+
+
+### Bug Fixes
+
+* **deps:** update dependency typer to ~=0.21.0 ([cdcea8a](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/cdcea8a6e8034a0f86983d7f31fdd1885cc5e4a5))
+* **deps:** update dependency typer to ~=0.21.0 ([ceab4bb](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/ceab4bb9187a4fee1a248d08f81cd1b542111419))
+* **deps:** update minor updates ([dfcd627](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/dfcd627da7924e32541e9cca573ff60d0d53cf12))
+* **deps:** update minor updates ([dbc20b7](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/dbc20b771bed472c562f7d390b04ce560107dd5e))
+
 ## 0.1.0 (2025-12-13)
 
 
