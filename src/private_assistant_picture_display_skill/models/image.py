@@ -25,12 +25,11 @@ class Image(SQLModel, table=True):
         priority: Weight for future priority-based selection (default 0)
         original_width: Image width in pixels
         original_height: Image height in pixels
-        fetched_at: When the image was added to the system
         last_displayed_at: When the image was last shown (for FIFO selection)
-        display_count: Number of times this image has been displayed
         expires_at: Optional expiration time for auto-cleanup
-        tags: List of tags for categorization
-        extra: Source-specific metadata (JSONB)
+        created_at: When record was created (replaces fetched_at)
+        updated_at: When record was last updated
+        tags: Comma-separated tags for categorization
     """
 
     __tablename__ = "images"
@@ -54,6 +53,10 @@ class Image(SQLModel, table=True):
     original_height: int | None = Field(default=None, description="Image height in pixels")
 
     # Timestamps
-    fetched_at: datetime = Field(default_factory=datetime.now, description="When image was added")
     last_displayed_at: datetime | None = Field(default=None, description="Last display time for FIFO")
     expires_at: datetime | None = Field(default=None, description="Expiration time for cleanup")
+    created_at: datetime = Field(default_factory=datetime.now, description="When record was created")
+    updated_at: datetime = Field(default_factory=datetime.now, description="When record was last updated")
+
+    # Categorization
+    tags: str | None = Field(default=None, description="Comma-separated tags for categorization")

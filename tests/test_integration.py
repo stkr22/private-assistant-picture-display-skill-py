@@ -105,7 +105,7 @@ async def test_image(db_session) -> AsyncGenerator[Image, None]:
         original_width=1600,
         original_height=1200,
         display_duration_seconds=60,
-        fetched_at=datetime.now(),
+        created_at=datetime.now(),
     )
     db_session.add(image)
     await db_session.commit()
@@ -326,7 +326,7 @@ async def rotation_test_setup(db_engine, skill_config_file, mqtt_config):
             original_width=1600,
             original_height=1200,
             display_duration_seconds=60,
-            fetched_at=datetime.now() - timedelta(days=1),
+            created_at=datetime.now() - timedelta(days=1),
             last_displayed_at=datetime.now() - timedelta(hours=1),
         )
         session.add(current_image)
@@ -340,7 +340,7 @@ async def rotation_test_setup(db_engine, skill_config_file, mqtt_config):
             original_width=1600,
             original_height=1200,
             display_duration_seconds=60,
-            fetched_at=datetime.now(),
+            created_at=datetime.now(),
             last_displayed_at=None,
         )
         session.add(next_image)
