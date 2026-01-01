@@ -10,7 +10,7 @@ github_username: stkr22
 project_description: Skill to dynamically display images from various sources via
     external agents.
 project_name: private-assistant-picture-display-skill
-publish_to_pypi: false
+publish_to_pypi: true
 python_package_distribution_name: private-assistant-picture-display-skill
 python_package_import_name: private_assistant_picture_display_skill
 python_package_version: 0.0.1
