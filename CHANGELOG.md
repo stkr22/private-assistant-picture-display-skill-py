@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.2.0...v0.3.0) (2026-01-02)
+
+
+### Features
+
+* :recycle: modernize infrastructure with create_skill_engine and MqttConfig [AI] ([c14d008](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/c14d0080642c21872c94ebf480ddc1d84f6b122e)), closes [#31](https://github.com/stkr22/private-assistant-picture-display-skill-py/issues/31)
+* :recycle: update devcontainer configuration and improve .gitignore ([50d24db](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/50d24db43b16c4af8246e33f2a889009d9de0bec))
+* modernize infrastructure with create_skill_engine and MqttConfig ([9a9ec91](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/9a9ec9133406b5cf80c9ea2e858ac967a5f9d62b))
+
 ## [0.2.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.1.0...v0.2.0) (2026-01-01)
 
 
