@@ -6,9 +6,13 @@ from typing import Annotated
 
 import jinja2
 import typer
-from private_assistant_commons import mqtt_connection_handler, skill_config, skill_logger
-from private_assistant_commons.database import PostgresConfig
-from sqlalchemy.ext.asyncio import create_async_engine
+from private_assistant_commons import (
+    MqttConfig,
+    create_skill_engine,
+    mqtt_connection_handler,
+    skill_config,
+    skill_logger,
+)
 
 from private_assistant_picture_display_skill.config import PictureSkillConfig
 from private_assistant_picture_display_skill.models.device import DeviceDisplayState
@@ -40,10 +44,9 @@ async def start_skill(config_path: pathlib.Path) -> None:
     # Load configuration from YAML
     config_obj = skill_config.load_config(config_path, PictureSkillConfig)
 
-    # Create async database engine
-    # AIDEV-NOTE: PostgresConfig uses environment variables (POSTGRES_*)
-    db_config = PostgresConfig()
-    db_engine_async = create_async_engine(db_config.connection_string_async)
+    # Create async database engine with connection pooling and resilience
+    # AIDEV-NOTE: create_skill_engine uses PostgresConfig from env (POSTGRES_*) and adds pool_pre_ping, pool_recycle
+    db_engine_async = create_skill_engine()
 
     # Create only skill-specific tables, not all SQLModel metadata
     # AIDEV-NOTE: Global device registry tables are managed by BaseSkill and commons
@@ -62,9 +65,11 @@ async def start_skill(config_path: pathlib.Path) -> None:
 
     # Start the skill using the async MQTT connection handler
     # AIDEV-NOTE: mqtt_connection_handler manages MQTT lifecycle with auto-reconnect
+    mqtt_config = MqttConfig()
     await mqtt_connection_handler.mqtt_connection_handler(
         PictureSkill,
         config_obj,
+        mqtt_config=mqtt_config,
         retry_interval=5,
         logger=logger,
         template_env=template_env,
