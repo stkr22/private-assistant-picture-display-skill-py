@@ -34,4 +34,5 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Set the user to 'appuser'
 USER appuser
 
-CMD ["private-assistant-picture-display-skill"]
+ENTRYPOINT ["private-assistant-picture-display-skill"]
+CMD ["main"]

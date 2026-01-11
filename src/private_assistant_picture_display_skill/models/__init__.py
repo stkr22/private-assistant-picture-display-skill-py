@@ -9,6 +9,7 @@ from .commands import (
 )
 from .device import DeviceDisplayState
 from .image import Image
+from .immich_sync_job import ImmichSyncJob, SyncStrategy
 
 __all__ = [
     "DeviceAcknowledge",
@@ -17,5 +18,7 @@ __all__ = [
     "DisplayCommand",
     "DisplayInfo",
     "Image",
+    "ImmichSyncJob",
     "RegistrationResponse",
+    "SyncStrategy",
 ]
