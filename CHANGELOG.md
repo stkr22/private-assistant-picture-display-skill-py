@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.3.0...v0.4.0) (2026-01-11)
+
+
+### Features
+
+* :sparkles: add immich sync integration for image sourcing [AI] ([378d0b3](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/378d0b30326cbb281c29d43fb086d9b1e5c3db3f))
+
+
+### Documentation
+
+* :memo: update container and docs for immich-sync command [AI] ([0063ebb](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/0063ebb41643fc7833269c553ac10c15ac1f904a))
+
 ## [0.3.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.2.0...v0.3.0) (2026-01-02)
 
 
