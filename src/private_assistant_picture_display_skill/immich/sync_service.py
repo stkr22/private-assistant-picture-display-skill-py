@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID
 
 import sqlalchemy
+from private_assistant_commons.database.models import GlobalDevice
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -238,16 +239,14 @@ class ImmichSyncService:
         async with AsyncSession(self.engine) as session:
             # Query global_devices table (from private-assistant-commons)
             # AIDEV-NOTE: global_devices uses device_attributes JSON for display specs
-            result = await session.exec(
-                select("*").select_from("global_devices").where(device_id == "id")  # type: ignore[arg-type]
-            )
-            row = result.first()
+            result = await session.exec(select(GlobalDevice).where(GlobalDevice.id == device_id))
+            device = result.first()
 
-        if not row:
+        if not device:
             raise ValueError(f"Target device not found: {device_id}")
 
         # Extract device_attributes JSON
-        attrs: dict[str, Any] = row.device_attributes or {}  # type: ignore[attr-defined]
+        attrs: dict[str, Any] = device.device_attributes or {}
 
         width = attrs.get("display_width")
         height = attrs.get("display_height")
