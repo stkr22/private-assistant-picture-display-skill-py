@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.0...v0.4.1) (2026-01-12)
+
+
+### Bug Fixes
+
+* :bug: update default display duration to 10 minutes ([b85aacf](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/b85aacfcb06509d5a96904c8ecede19980cf5b70))
+
 ## [0.4.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.3.0...v0.4.0) (2026-01-11)
 
 
