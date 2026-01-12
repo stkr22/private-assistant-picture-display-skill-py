@@ -45,7 +45,7 @@ class Image(SQLModel, table=True):
     source_url: str | None = Field(default=None, description="Original source URL")
 
     # Display settings
-    display_duration_seconds: int = Field(default=3600, description="Display duration in seconds")
+    display_duration_seconds: int = Field(default=600, description="Display duration in seconds")
     priority: int = Field(default=0, description="Priority weight for selection (higher = more likely)")
 
     # Image dimensions for device compatibility
