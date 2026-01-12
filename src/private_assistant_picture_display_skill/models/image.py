@@ -46,7 +46,7 @@ class Image(SQLModel, table=True):
 
     # Display settings
     display_duration_seconds: int = Field(default=600, description="Display duration in seconds")
-    priority: int = Field(default=0, description="Priority weight for selection (higher = more likely)")
+    priority: int = Field(default=5, description="Priority weight for selection (higher = more likely)")
 
     # Image dimensions for device compatibility
     original_width: int | None = Field(default=None, description="Image width in pixels")
