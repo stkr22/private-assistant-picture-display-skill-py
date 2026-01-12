@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.2...v0.4.3) (2026-01-12)
+
+
+### Bug Fixes
+
+* update default priority for image selection ([85dabbf](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/85dabbfc0ebfc959ee54c2a26e580b9e018fa93c))
+
 ## [0.4.2](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.1...v0.4.2) (2026-01-12)
 
 
