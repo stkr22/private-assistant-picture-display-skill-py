@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.1...v0.4.2) (2026-01-12)
+
+
+### Bug Fixes
+
+* raw text select issue ([bf71862](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/bf7186286f3f51c0d2b55b647a808cef51cb429d))
+
 ## [0.4.1](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.0...v0.4.1) (2026-01-12)
 
 
