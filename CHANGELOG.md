@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.4](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.3...v0.4.4) (2026-01-13)
+
+
+### Bug Fixes
+
+* :bug: store processed dimensions and require exact match for image selection [AI] ([5890339](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/589033972b4e33977fdda3e544170d69d6236bf1))
+* :bug: store processed dimensions and require exact match for image selection [AI] ([a13d877](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/a13d87730c3b23d992b3fdff90d9b8aeb57a5696))
+
 ## [0.4.3](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.2...v0.4.3) (2026-01-12)
 
 
