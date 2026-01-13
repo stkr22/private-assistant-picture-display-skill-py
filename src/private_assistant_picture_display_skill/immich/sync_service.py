@@ -331,8 +331,10 @@ class ImmichSyncService:
                 content_type="image/jpeg",
             )
 
-        # Create database record
-        await self._upsert_image_record(asset, storage_path, source_url, job.name)
+        # Create database record with processed dimensions
+        await self._upsert_image_record(
+            asset, storage_path, source_url, job.name, processed_dimensions=(target_width, target_height)
+        )
 
         return ProcessResult.DOWNLOADED
 
@@ -348,6 +350,7 @@ class ImmichSyncService:
         storage_path: str,
         source_url: str,
         source_name: str,
+        processed_dimensions: tuple[int, int],
     ) -> None:
         """Create or update Image record in database."""
         async with AsyncSession(self.engine) as session:
@@ -368,6 +371,10 @@ class ImmichSyncService:
             # Set/update metadata with natural language descriptions
             await self._populate_image_from_asset(image, asset)
 
+            # Set processed dimensions (post-crop, what's actually stored in MinIO)
+            image.original_width = processed_dimensions[0]
+            image.original_height = processed_dimensions[1]
+
             await session.commit()
             await session.refresh(image)
             self.logger.debug("Saved image record: %s", image.id)
@@ -383,8 +390,6 @@ class ImmichSyncService:
             state = asset.exif_info.state
             country = asset.exif_info.country
             date = asset.exif_info.date_time_original or date
-            image.original_width = asset.exif_info.exif_image_width
-            image.original_height = asset.exif_info.exif_image_height
 
         album_names = await self._get_asset_album_names(asset.id)
 

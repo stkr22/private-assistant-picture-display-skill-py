@@ -63,16 +63,17 @@ class ImageManager:
         display_width = attrs.get("display_width")
         display_height = attrs.get("display_height")
 
-        async with AsyncSession(self.engine) as session:
-            # Build query - filter by device compatibility if dimensions known
-            query = select(Image)
+        # Device must have both dimensions set
+        if display_width is None or display_height is None:
+            self.logger.warning("Device %s missing display dimensions, skipping", device.name)
+            return None
 
-            if display_width is not None:
-                query = query.where(col(Image.original_width).is_(None) | (col(Image.original_width) <= display_width))
-            if display_height is not None:
-                query = query.where(
-                    col(Image.original_height).is_(None) | (col(Image.original_height) <= display_height)
-                )
+        async with AsyncSession(self.engine) as session:
+            # Build query - require exact dimension match
+            query = select(Image).where(
+                col(Image.original_width) == display_width,
+                col(Image.original_height) == display_height,
+            )
 
             # Order by FIFO (nulls first = never displayed)
             query = query.order_by(col(Image.last_displayed_at).asc().nullsfirst()).limit(1)
