@@ -49,6 +49,7 @@ class SyncResult:
     skipped_existing: int = 0
     skipped_undersized: int = 0  # Too small for target dimensions
     skipped_color_mismatch: int = 0  # Color profile incompatible
+    stopped_at_limit: bool = False  # True if total image limit was reached
     errors: list[str] = field(default_factory=list)
 
     @property
@@ -58,11 +59,12 @@ class SyncResult:
 
     def __str__(self) -> str:
         """Return human-readable summary."""
+        limit_info = ", stopped_at_limit=True" if self.stopped_at_limit else ""
         return (
             f"SyncResult(fetched={self.fetched}, filtered={self.filtered}, "
             f"downloaded={self.downloaded}, skipped_existing={self.skipped_existing}, "
             f"skipped_undersized={self.skipped_undersized}, "
-            f"skipped_color={self.skipped_color_mismatch}, errors={len(self.errors)})"
+            f"skipped_color={self.skipped_color_mismatch}, errors={len(self.errors)}{limit_info})"
         )
 
 
@@ -120,6 +122,7 @@ class ImmichSyncService:
             Dict mapping job name to SyncResult
         """
         results: dict[str, SyncResult] = {}
+        total_uploads = 0  # Track uploads across all jobs in this run
 
         async with AsyncSession(self.engine) as session:
             stmt = select(ImmichSyncJob).where(ImmichSyncJob.is_active == sqlalchemy.true())
@@ -131,14 +134,56 @@ class ImmichSyncService:
             return results
 
         self.logger.info("Found %d active sync jobs", len(jobs))
+
+        # Check total image limit
+        max_images = self.sync_config.max_images
+        existing_count = await self._count_existing_immich_images()
+
+        if max_images > 0:
+            remaining_capacity = max_images - existing_count
+            self.logger.info(
+                "Existing Immich images: %d, limit: %d, can upload: %d",
+                existing_count,
+                max_images,
+                max(0, remaining_capacity),
+            )
+            if remaining_capacity <= 0:
+                self.logger.warning(
+                    "Total image limit reached (%d/%d), skipping all jobs",
+                    existing_count,
+                    max_images,
+                )
+                for job in jobs:
+                    skip_result = SyncResult()
+                    skip_result.stopped_at_limit = True
+                    results[job.name] = skip_result
+                return results
+
         self.storage.ensure_bucket_exists()
 
         async with self.immich.connect():
             for job in jobs:
+                # Check if limit reached during this run
+                if max_images > 0:
+                    remaining = max_images - existing_count - total_uploads
+                    if remaining <= 0:
+                        self.logger.info(
+                            "Skipping job '%s': total image limit (%d) already reached",
+                            job.name,
+                            max_images,
+                        )
+                        skip_result = SyncResult()
+                        skip_result.stopped_at_limit = True
+                        results[job.name] = skip_result
+                        continue
+
                 self.logger.info("Processing sync job: %s", job.name)
                 try:
-                    result = await self._sync_job(job)
+                    # Calculate remaining uploads allowed for this job
+                    max_uploads_remaining = max_images - existing_count - total_uploads if max_images > 0 else None
+                    result = await self._sync_job(job, max_uploads_remaining=max_uploads_remaining)
                     results[job.name] = result
+                    total_uploads += result.downloaded
                     self.logger.info("Job '%s' completed: %s", job.name, result)
                 except Exception as e:
                     error_result = SyncResult()
@@ -146,13 +191,22 @@ class ImmichSyncService:
                     results[job.name] = error_result
                     self.logger.exception("Job '%s' failed", job.name)
 
+        if max_images > 0:
+            self.logger.info(
+                "Uploaded %d images this run, total Immich images now: %d/%d",
+                total_uploads,
+                existing_count + total_uploads,
+                max_images,
+            )
+
         return results
 
-    async def _sync_job(self, job: ImmichSyncJob) -> SyncResult:
+    async def _sync_job(self, job: ImmichSyncJob, max_uploads_remaining: int | None = None) -> SyncResult:
         """Execute a single sync job.
 
         Args:
             job: Sync job configuration
+            max_uploads_remaining: Maximum uploads allowed for this job (None = unlimited)
 
         Returns:
             SyncResult with counts and any errors
@@ -207,22 +261,37 @@ class ImmichSyncService:
 
         # Process each asset
         for asset in assets:
+            # Check if upload limit reached mid-job
+            if max_uploads_remaining is not None and result.downloaded >= max_uploads_remaining:
+                self.logger.info(
+                    "Stopping job '%s': reached total image limit (downloaded %d in this job)",
+                    job.name,
+                    result.downloaded,
+                )
+                result.stopped_at_limit = True
+                break
+
             try:
                 process_result = await self._process_asset(asset, job, device_reqs)
-                if process_result == ProcessResult.DOWNLOADED:
-                    result.downloaded += 1
-                elif process_result == ProcessResult.SKIPPED_EXISTING:
-                    result.skipped_existing += 1
-                elif process_result == ProcessResult.SKIPPED_UNDERSIZED:
-                    result.skipped_undersized += 1
-                elif process_result == ProcessResult.SKIPPED_COLOR_MISMATCH:
-                    result.skipped_color_mismatch += 1
+                self._update_result_counters(result, process_result)
             except Exception as e:
                 error_msg = f"Failed to process asset {asset.id}: {e}"
                 result.errors.append(error_msg)
                 self.logger.exception("Failed to process asset %s", asset.id)
 
         return result
+
+    @staticmethod
+    def _update_result_counters(result: SyncResult, process_result: ProcessResult) -> None:
+        """Update result counters based on process result."""
+        if process_result == ProcessResult.DOWNLOADED:
+            result.downloaded += 1
+        elif process_result == ProcessResult.SKIPPED_EXISTING:
+            result.skipped_existing += 1
+        elif process_result == ProcessResult.SKIPPED_UNDERSIZED:
+            result.skipped_undersized += 1
+        elif process_result == ProcessResult.SKIPPED_COLOR_MISMATCH:
+            result.skipped_color_mismatch += 1
 
     async def _get_device_requirements(self, device_id: UUID) -> DeviceRequirements:
         """Get display requirements from global device table.
@@ -343,6 +412,20 @@ class ImmichSyncService:
         async with AsyncSession(self.engine) as session:
             result = await session.exec(select(Image).where(Image.source_url == source_url))
             return result.first()
+
+    async def _count_existing_immich_images(self) -> int:
+        """Count images already synced from Immich.
+
+        Returns:
+            Number of images with source_url starting with 'immich://'
+        """
+        async with AsyncSession(self.engine) as session:
+            result = await session.exec(
+                select(sqlalchemy.func.count())
+                .select_from(Image)
+                .where(Image.source_url.like("immich://%"))  # type: ignore[union-attr]
+            )
+            return result.one()
 
     async def _upsert_image_record(
         self,
