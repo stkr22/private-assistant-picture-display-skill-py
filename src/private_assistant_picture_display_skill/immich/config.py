@@ -58,6 +58,7 @@ class ImmichSyncConfig(BaseSettings):
         IMMICH_SKIP_EXISTING: Skip already synced images (default: True)
         IMMICH_TARGET_WIDTH: Process images to this width
         IMMICH_TARGET_HEIGHT: Process images to this height
+        IMMICH_MAX_IMAGES: Maximum total Immich images in database (default: 20, 0=unlimited)
     """
 
     model_config = SettingsConfigDict(env_prefix="IMMICH_")
@@ -77,6 +78,11 @@ class ImmichSyncConfig(BaseSettings):
     target_height: int | None = Field(
         default=None,
         description="Process images to this height (None = no processing)",
+    )
+    max_images: int = Field(
+        default=20,
+        ge=0,
+        description="Maximum total Immich images in database (0 = unlimited)",
     )
 
 
