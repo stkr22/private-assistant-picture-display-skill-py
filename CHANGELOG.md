@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.4...v0.5.0) (2026-01-19)
+
+
+### Features
+
+* :sparkles: add configurable total image limit for Immich sync [AI] ([325cb67](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/325cb6764bb3ce975531a298827d0a8d2260321b))
+
 ## [0.4.4](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.3...v0.4.4) (2026-01-13)
 
 
