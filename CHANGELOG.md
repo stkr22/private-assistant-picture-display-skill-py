@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.5.0...v0.6.0) (2026-01-31)
+
+
+### Features
+
+* :arrow_up: update to latest copier template and migrate help text ([149e78b](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/149e78b604c620a5ffc67b8fc38dfe24f916f326))
+* :arrow_up: update to latest copier template and migrate help text ([ab9ade2](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/ab9ade24146e6231c6b6070816aa1d03a7959df2))
+
 ## [0.5.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.4.4...v0.5.0) (2026-01-19)
 
 
