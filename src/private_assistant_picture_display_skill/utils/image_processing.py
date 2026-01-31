@@ -49,6 +49,7 @@ class ImageProcessor:
 
         Raises:
             ImageProcessingError: If image cannot be processed
+
         """
         try:
             with Image.open(BytesIO(image_data)) as original:

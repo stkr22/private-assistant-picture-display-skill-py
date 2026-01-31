@@ -27,6 +27,7 @@ class MinioStorageClient:
         Args:
             config: MinIO configuration with write credentials
             logger: Logger instance
+
         """
         self.config = config
         self.logger = logger
@@ -51,6 +52,7 @@ class MinioStorageClient:
 
         Returns:
             True if object exists
+
         """
         try:
             self._client.stat_object(self.config.bucket, object_path)
@@ -76,6 +78,7 @@ class MinioStorageClient:
 
         Returns:
             Full storage path (bucket/object_path)
+
         """
         # Collect stream into buffer
         buffer = BytesIO()
@@ -111,6 +114,7 @@ class MinioStorageClient:
 
         Returns:
             Full storage path (bucket/object_path)
+
         """
         buffer = BytesIO(data)
         size = len(data)

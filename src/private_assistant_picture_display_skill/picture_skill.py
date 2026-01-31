@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import jinja2
 from private_assistant_commons import BaseSkill, IntentRequest, IntentType
-from private_assistant_commons.database.models import GlobalDevice
+from private_assistant_commons.database import GlobalDevice
 from pydantic import ValidationError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -37,12 +37,18 @@ class PictureSkill(BaseSkill):
     Handles voice commands to control image display on Inky devices:
     - "next picture" / "show next" - Display next image in queue
     - "what am I seeing?" / "describe this picture" - Describe current image
-    - "help with pictures" - Get help text
 
     The skill connects to two MQTT brokers:
     1. Internal MQTT (via BaseSkill): For intent engine communication
     2. Device MQTT (authenticated): For Inky device communication
     """
+
+    # Help text for the skill (automatically stored in database)
+    help_text = (
+        "You can control the picture display with these commands. "
+        'Say "next picture" to show the next image. '
+        'Say "what am I seeing" to hear a description of the current picture.'
+    )
 
     # Class attribute for rotation check interval (seconds) - can be overridden in tests
     rotation_check_interval: int = 30
@@ -65,6 +71,7 @@ class PictureSkill(BaseSkill):
             engine: Async database engine
             logger: Optional custom logger
             template_env: Jinja2 template environment for voice responses
+
         """
         super().__init__(
             config_obj=config_obj,
@@ -86,8 +93,7 @@ class PictureSkill(BaseSkill):
         # Configure supported intents with confidence thresholds
         self.supported_intents = {
             IntentType.MEDIA_NEXT: 0.8,  # "next picture", "show next", "skip"
-            IntentType.QUERY_STATUS: 0.7,  # "what am I seeing?", "describe this"
-            IntentType.SYSTEM_HELP: 0.7,  # "help with pictures"
+            IntentType.DEVICE_QUERY: 0.7,  # "what am I seeing?", "describe this"
         }
 
         # Device type for global registry
@@ -162,6 +168,7 @@ class PictureSkill(BaseSkill):
 
         Args:
             message: Incoming MQTT message
+
         """
         if self.device_mqtt is None:
             return
@@ -187,6 +194,7 @@ class PictureSkill(BaseSkill):
 
         Args:
             payload: Registration payload from device
+
         """
         if self.device_mqtt is None:
             self.logger.error("Device MQTT client not initialized")
@@ -263,6 +271,7 @@ class PictureSkill(BaseSkill):
 
         Returns:
             GlobalDevice if found, None otherwise
+
         """
         device: GlobalDevice
         for device in self.global_devices:
@@ -280,6 +289,7 @@ class PictureSkill(BaseSkill):
 
         Returns:
             The device UUID
+
         """
         async with AsyncSession(self.engine) as session:
             result = await session.exec(select(GlobalDevice).where(GlobalDevice.id == device_id))
@@ -301,6 +311,7 @@ class PictureSkill(BaseSkill):
 
         Args:
             global_device_id: GlobalDevice UUID
+
         """
         async with AsyncSession(self.engine) as session:
             result = await session.exec(
@@ -325,6 +336,7 @@ class PictureSkill(BaseSkill):
         Args:
             device_name: Device name from topic
             payload: Acknowledgment payload from device
+
         """
         try:
             ack = DeviceAcknowledge.model_validate(payload)
@@ -352,16 +364,15 @@ class PictureSkill(BaseSkill):
 
         Args:
             intent_request: Validated intent request
+
         """
         intent_type = intent_request.classified_intent.intent_type
 
         match intent_type:
             case IntentType.MEDIA_NEXT:
                 await self._handle_media_next(intent_request)
-            case IntentType.QUERY_STATUS:
+            case IntentType.DEVICE_QUERY:
                 await self._handle_query_status(intent_request)
-            case IntentType.SYSTEM_HELP:
-                await self._handle_system_help(intent_request)
             case _:
                 self.logger.warning("Unhandled intent type: %s", intent_type)
 
@@ -378,6 +389,7 @@ class PictureSkill(BaseSkill):
 
         Returns:
             Selected GlobalDevice or None if no suitable device found
+
         """
         device: GlobalDevice  # Type annotation for loop variable
 
@@ -417,6 +429,7 @@ class PictureSkill(BaseSkill):
 
         Returns:
             True if device is online, False otherwise
+
         """
         async with AsyncSession(self.engine) as session:
             result = await session.exec(
@@ -430,6 +443,7 @@ class PictureSkill(BaseSkill):
 
         Args:
             intent_request: Intent request with client info
+
         """
         if self.image_manager is None:
             await self.send_response(
@@ -469,6 +483,7 @@ class PictureSkill(BaseSkill):
 
         Args:
             intent_request: Intent request with client info
+
         """
         if self.image_manager is None:
             await self.send_response(
@@ -498,16 +513,6 @@ class PictureSkill(BaseSkill):
         # Send voice response with image description
         template = self.template_env.get_template("describe_image.j2")
         response_text = template.render(image=image)
-        await self.send_response(response_text, intent_request.client_request)
-
-    async def _handle_system_help(self, intent_request: IntentRequest) -> None:
-        """Handle help request.
-
-        Args:
-            intent_request: Intent request with client info
-        """
-        template = self.template_env.get_template("help.j2")
-        response_text = template.render()
         await self.send_response(response_text, intent_request.client_request)
 
     async def _start_rotation_scheduler(self) -> None:
@@ -549,6 +554,7 @@ class PictureSkill(BaseSkill):
 
         Args:
             global_device_id: UUID of the GlobalDevice to rotate
+
         """
         if self.image_manager is None:
             return

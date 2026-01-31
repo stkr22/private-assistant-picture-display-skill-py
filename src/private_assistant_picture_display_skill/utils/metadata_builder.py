@@ -33,6 +33,7 @@ class MetadataBuilder:
 
         Returns:
             Short title string or None if no data available
+
         """
         parts: list[str] = []
 
@@ -78,6 +79,7 @@ class MetadataBuilder:
 
         Returns:
             Full description string or None if no data available
+
         """
         sentences: list[str] = []
 

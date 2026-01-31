@@ -33,6 +33,7 @@ def main(config_path: Annotated[pathlib.Path, typer.Argument(envvar="PRIVATE_ASS
 
     Args:
         config_path: Path to YAML configuration file or directory
+
     """
     asyncio.run(start_skill(config_path))
 
@@ -42,6 +43,7 @@ async def start_skill(config_path: pathlib.Path) -> None:
 
     Args:
         config_path: Path to YAML configuration file or directory
+
     """
     # Set up logger early on
     logger = skill_logger.SkillLogger.get_logger("Private Assistant PictureSkill")
@@ -109,6 +111,7 @@ async def run_immich_sync(dry_run: bool) -> int:
 
     Returns:
         Exit code (0 for success, 1 for failure)
+
     """
     logger = skill_logger.SkillLogger.get_logger("Immich Sync")
 

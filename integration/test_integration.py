@@ -37,7 +37,7 @@ from private_assistant_commons import (
     IntentType,
     create_skill_engine,
 )
-from private_assistant_commons.database.models import DeviceType, GlobalDevice, Skill
+from private_assistant_commons.database import DeviceType, GlobalDevice, Skill
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -314,7 +314,7 @@ class TestMediaNextCommand:
 
 @pytest.fixture
 async def rotation_test_setup(db_engine, skill_config_file, mqtt_config):
-    """Combined fixture that sets up everything for rotation testing.
+    """Set up everything for rotation testing.
 
     Creates images, device, display state, and starts skill - all in one fixture
     to avoid session sharing issues between fixtures.

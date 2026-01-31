@@ -40,6 +40,7 @@ class ColorProfileAnalyzer:
 
         Returns:
             Compatibility score 0.0-1.0 (1.0 = perfect match)
+
         """
         with Image.open(BytesIO(image_data)) as img:
             # Convert and resize for speed

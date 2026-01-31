@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
-from private_assistant_commons.database.models import GlobalDevice
+from private_assistant_commons.database import GlobalDevice
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -38,6 +38,7 @@ class ImageManager:
             device_mqtt: Device MQTT client for commands
             skill_config: Skill configuration
             logger: Logger instance from parent skill
+
         """
         self.engine = engine
         self.device_mqtt = device_mqtt
@@ -57,6 +58,7 @@ class ImageManager:
 
         Returns:
             Next image to display, or None if no suitable images available
+
         """
         # Extract display dimensions from device_attributes
         attrs = device.device_attributes or {}
@@ -87,6 +89,7 @@ class ImageManager:
         Args:
             device: GlobalDevice to send command to
             image: Image to display
+
         """
         # Create display command
         command = DisplayCommand(
@@ -115,6 +118,7 @@ class ImageManager:
         Args:
             global_device_id: GlobalDevice UUID that received the command
             image: Image being displayed
+
         """
         now = datetime.now()
 
@@ -160,6 +164,7 @@ class ImageManager:
 
         Returns:
             Currently displayed image, or None if not displaying
+
         """
         async with AsyncSession(self.engine) as session:
             # Get display state

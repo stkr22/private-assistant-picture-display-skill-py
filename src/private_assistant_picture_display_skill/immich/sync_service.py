@@ -9,7 +9,7 @@ from typing import Any
 from uuid import UUID
 
 import sqlalchemy
-from private_assistant_commons.database.models import GlobalDevice
+from private_assistant_commons.database import GlobalDevice
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -96,6 +96,7 @@ class ImmichSyncService:
             connection_config: Immich connection settings (defaults to env vars)
             sync_config: Global sync settings (defaults to env vars)
             minio_config: MinIO writer config (defaults to env vars)
+
         """
         self.engine = engine
         self.logger = logger
@@ -120,6 +121,7 @@ class ImmichSyncService:
 
         Returns:
             Dict mapping job name to SyncResult
+
         """
         results: dict[str, SyncResult] = {}
         total_uploads = 0  # Track uploads across all jobs in this run
@@ -210,6 +212,7 @@ class ImmichSyncService:
 
         Returns:
             SyncResult with counts and any errors
+
         """
         result = SyncResult()
 
@@ -304,6 +307,7 @@ class ImmichSyncService:
 
         Raises:
             ValueError: If device not found or missing required display attributes
+
         """
         async with AsyncSession(self.engine) as session:
             # Query global_devices table (from private-assistant-commons)
@@ -349,6 +353,7 @@ class ImmichSyncService:
 
         Returns:
             ProcessResult indicating what happened
+
         """
         source_url = self._build_source_url(asset.id)
 
@@ -418,12 +423,11 @@ class ImmichSyncService:
 
         Returns:
             Number of images with source_url starting with 'immich://'
+
         """
         async with AsyncSession(self.engine) as session:
             result = await session.exec(
-                select(sqlalchemy.func.count())
-                .select_from(Image)
-                .where(Image.source_url.like("immich://%"))  # type: ignore[union-attr]
+                select(sqlalchemy.func.count()).select_from(Image).where(Image.source_url.like("immich://%"))  # type: ignore[union-attr]
             )
             return result.one()
 
@@ -535,6 +539,7 @@ class ImmichSyncService:
 
         Returns:
             Filtered list limited to job.count
+
         """
         filtered: list[ImmichAsset] = []
 
