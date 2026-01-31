@@ -78,13 +78,9 @@ class ImmichAlbum(BaseModel):
 class RandomSearchResponse(RootModel[list[ImmichAsset]]):
     """Response from POST /search/random - returns list of assets directly."""
 
-    pass
-
 
 class AlbumsResponse(RootModel[list[ImmichAlbum]]):
     """Response from GET /albums - returns list of albums."""
-
-    pass
 
 
 class SearchAssetResponseDto(BaseModel):

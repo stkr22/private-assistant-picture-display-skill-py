@@ -49,6 +49,7 @@ class ImmichClient:
         Args:
             config: Connection configuration (includes api_key)
             logger: Logger instance
+
         """
         self.base_url = str(config.base_url).rstrip("/")
         self.timeout = config.timeout_seconds
@@ -105,6 +106,7 @@ class ImmichClient:
 
         Returns:
             List of matching assets
+
         """
         payload = self._build_random_payload(job, count_override)
         body = payload.model_dump(by_alias=True, exclude_none=True)
@@ -134,6 +136,7 @@ class ImmichClient:
 
         Raises:
             ValueError: If job.query is not set
+
         """
         if not job.query:
             raise ValueError("Smart search requires a query string")
@@ -213,6 +216,7 @@ class ImmichClient:
 
         Yields:
             Chunks of file data
+
         """
         if self._client is None:
             raise RuntimeError("Client not connected")
@@ -233,6 +237,7 @@ class ImmichClient:
 
         Returns:
             Asset with full details including people/faces
+
         """
         response = await self._request("GET", f"/api/assets/{asset_id}")
         return ImmichAsset.model_validate(response.json())
@@ -245,6 +250,7 @@ class ImmichClient:
 
         Returns:
             List of albums containing this asset
+
         """
         response = await self._request("GET", "/api/albums", params={"assetId": asset_id})
         return AlbumsResponse.model_validate(response.json()).root

@@ -30,6 +30,7 @@ class Image(SQLModel, table=True):
         created_at: When record was created (replaces fetched_at)
         updated_at: When record was last updated
         tags: Comma-separated tags for categorization
+
     """
 
     __tablename__ = "images"

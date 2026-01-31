@@ -19,6 +19,7 @@ class DeviceDisplayState(SQLModel, table=True):
         current_image_id: Currently displayed image (nullable)
         displayed_since: When current image was displayed
         scheduled_next_at: When to show next image
+
     """
 
     __tablename__ = "device_display_states"

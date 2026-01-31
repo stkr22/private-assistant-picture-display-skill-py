@@ -43,6 +43,7 @@ class DeviceMqttClient:
         Args:
             config: Device MQTT configuration with host, port, and credentials
             logger: Logger instance from parent skill
+
         """
         self.config = config
         self.logger = logger
@@ -54,6 +55,7 @@ class DeviceMqttClient:
 
         Yields:
             Self for use in async context manager
+
         """
         async with aiomqtt.Client(
             hostname=self.config.host,
@@ -90,6 +92,7 @@ class DeviceMqttClient:
         Args:
             device_id: Target device identifier
             command: Command to send
+
         """
         if self._client is None:
             raise RuntimeError("MQTT client not connected")
@@ -106,6 +109,7 @@ class DeviceMqttClient:
         Args:
             device_id: Device that registered
             response: Registration response with credentials
+
         """
         if self._client is None:
             raise RuntimeError("MQTT client not connected")
@@ -121,6 +125,7 @@ class DeviceMqttClient:
 
         Yields:
             MQTT messages from subscribed topics
+
         """
         if self._client is None:
             raise RuntimeError("MQTT client not connected")
@@ -137,6 +142,7 @@ class DeviceMqttClient:
 
         Returns:
             Decoded JSON dictionary or None if decoding fails
+
         """
         try:
             if isinstance(payload, bytes | bytearray):
@@ -156,6 +162,7 @@ class DeviceMqttClient:
 
         Returns:
             Device ID or None if topic doesn't match expected pattern
+
         """
         parts = topic.split("/")
         if len(parts) == DeviceMqttClient._STATUS_TOPIC_PARTS and parts[0] == "inky" and parts[2] == "status":

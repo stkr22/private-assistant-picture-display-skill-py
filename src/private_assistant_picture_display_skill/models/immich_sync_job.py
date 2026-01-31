@@ -49,6 +49,7 @@ class ImmichSyncJob(SQLModel, table=True):
         camera_model: Camera model filter
         rating: Minimum rating filter (0-5)
         min_color_score: Minimum color compatibility for Spectra 6 (0.0-1.0)
+
     """
 
     __tablename__ = "immich_sync_jobs"
