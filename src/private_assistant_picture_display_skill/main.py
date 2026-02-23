@@ -99,18 +99,14 @@ def immich_sync(
     - MINIO_WRITER_*: MinIO connection for image storage
     - POSTGRES_*: Database connection (from commons)
     """
-    results = asyncio.run(run_immich_sync(dry_run))
-    typer.Exit(code=results)
+    asyncio.run(run_immich_sync(dry_run))
 
 
-async def run_immich_sync(dry_run: bool) -> int:
+async def run_immich_sync(dry_run: bool) -> None:
     """Run the Immich sync operation for all active jobs.
 
     Args:
         dry_run: If True, only show what would be synced
-
-    Returns:
-        Exit code (0 for success, 1 for failure)
 
     """
     logger = skill_logger.SkillLogger.get_logger("Immich Sync")
@@ -131,12 +127,12 @@ async def run_immich_sync(dry_run: bool) -> int:
 
         if not jobs:
             logger.warning("No active sync jobs found")
-            return 0
+            return
 
         logger.info("Dry run mode - would process %d job(s):", len(jobs))
         for job in jobs:
             logger.info("  - %s: strategy=%s, count=%d", job.name, job.strategy, job.count)
-        return 0
+        return
 
     # Run sync for all active jobs
     sync_service = ImmichSyncService(
@@ -144,11 +140,7 @@ async def run_immich_sync(dry_run: bool) -> int:
         logger=logger,
     )
 
-    results = await sync_service.sync_all_active_jobs()
-
-    # Return non-zero exit code if any job had errors
-    has_errors = any(not r.success for r in results.values())
-    return 1 if has_errors else 0
+    await sync_service.sync_all_active_jobs()
 
 
 if __name__ == "__main__":

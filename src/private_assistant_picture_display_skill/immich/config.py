@@ -84,6 +84,11 @@ class ImmichSyncConfig(BaseSettings):
         ge=0,
         description="Maximum total Immich images in database (0 = unlimited)",
     )
+    retention_days: int = Field(
+        default=7,
+        ge=0,
+        description="Days to keep Immich images before cleanup (0 = never expire)",
+    )
 
 
 class DeviceRequirements(BaseModel):

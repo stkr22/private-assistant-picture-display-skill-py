@@ -4,6 +4,7 @@ import logging
 import random
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import Enum, auto
 from typing import Any
 from uuid import UUID
@@ -23,6 +24,7 @@ from private_assistant_picture_display_skill.immich.config import (
 )
 from private_assistant_picture_display_skill.immich.models import ImmichAsset
 from private_assistant_picture_display_skill.immich.storage import MinioStorageClient
+from private_assistant_picture_display_skill.models.device import DeviceDisplayState
 from private_assistant_picture_display_skill.models.image import Image
 from private_assistant_picture_display_skill.models.immich_sync_job import ImmichSyncJob, SyncStrategy
 from private_assistant_picture_display_skill.utils.color_analysis import ColorProfileAnalyzer
@@ -52,11 +54,6 @@ class SyncResult:
     stopped_at_limit: bool = False  # True if total image limit was reached
     errors: list[str] = field(default_factory=list)
 
-    @property
-    def success(self) -> bool:
-        """Return True if no errors occurred."""
-        return len(self.errors) == 0
-
     def __str__(self) -> str:
         """Return human-readable summary."""
         limit_info = ", stopped_at_limit=True" if self.stopped_at_limit else ""
@@ -65,6 +62,23 @@ class SyncResult:
             f"downloaded={self.downloaded}, skipped_existing={self.skipped_existing}, "
             f"skipped_undersized={self.skipped_undersized}, "
             f"skipped_color={self.skipped_color_mismatch}, errors={len(self.errors)}{limit_info})"
+        )
+
+
+@dataclass
+class CleanupResult:
+    """Result of a cleanup operation."""
+
+    expired: int = 0
+    deleted: int = 0
+    protected: int = 0  # Skipped because currently displayed
+    storage_errors: int = 0  # DB deleted but MinIO deletion failed
+
+    def __str__(self) -> str:
+        """Return human-readable summary."""
+        return (
+            f"CleanupResult(expired={self.expired}, deleted={self.deleted}, "
+            f"protected={self.protected}, storage_errors={self.storage_errors})"
         )
 
 
@@ -116,14 +130,8 @@ class ImmichSyncService:
             logger=logger,
         )
 
-    async def sync_all_active_jobs(self) -> dict[str, SyncResult]:
-        """Execute all active sync jobs from database.
-
-        Returns:
-            Dict mapping job name to SyncResult
-
-        """
-        results: dict[str, SyncResult] = {}
+    async def sync_all_active_jobs(self) -> None:
+        """Execute all active sync jobs from database."""
         total_uploads = 0  # Track uploads across all jobs in this run
 
         async with AsyncSession(self.engine) as session:
@@ -133,9 +141,13 @@ class ImmichSyncService:
 
         if not jobs:
             self.logger.warning("No active sync jobs found in database")
-            return results
+            return
 
         self.logger.info("Found %d active sync jobs", len(jobs))
+
+        # Run cleanup before checking capacity (frees slots for new uploads)
+        if self.sync_config.retention_days > 0:
+            await self._cleanup_expired_images()
 
         # Check total image limit
         max_images = self.sync_config.max_images
@@ -155,11 +167,7 @@ class ImmichSyncService:
                     existing_count,
                     max_images,
                 )
-                for job in jobs:
-                    skip_result = SyncResult()
-                    skip_result.stopped_at_limit = True
-                    results[job.name] = skip_result
-                return results
+                return
 
         self.storage.ensure_bucket_exists()
 
@@ -174,9 +182,6 @@ class ImmichSyncService:
                             job.name,
                             max_images,
                         )
-                        skip_result = SyncResult()
-                        skip_result.stopped_at_limit = True
-                        results[job.name] = skip_result
                         continue
 
                 self.logger.info("Processing sync job: %s", job.name)
@@ -184,13 +189,9 @@ class ImmichSyncService:
                     # Calculate remaining uploads allowed for this job
                     max_uploads_remaining = max_images - existing_count - total_uploads if max_images > 0 else None
                     result = await self._sync_job(job, max_uploads_remaining=max_uploads_remaining)
-                    results[job.name] = result
                     total_uploads += result.downloaded
                     self.logger.info("Job '%s' completed: %s", job.name, result)
-                except Exception as e:
-                    error_result = SyncResult()
-                    error_result.errors.append(f"Job failed: {e}")
-                    results[job.name] = error_result
+                except Exception:
                     self.logger.exception("Job '%s' failed", job.name)
 
         if max_images > 0:
@@ -201,7 +202,74 @@ class ImmichSyncService:
                 max_images,
             )
 
-        return results
+    async def _cleanup_expired_images(self) -> CleanupResult:
+        """Remove expired Immich images from database and storage.
+
+        Deletes images where expires_at has passed. Protects images currently
+        displayed on any device by checking DeviceDisplayState.current_image_id.
+
+        Returns:
+            CleanupResult with counts and any errors
+
+        """
+        result = CleanupResult()
+        now = datetime.now()
+
+        async with AsyncSession(self.engine) as session:
+            # Find expired Immich images
+            expired_stmt = select(Image).where(
+                Image.source_url.like("immich://%"),  # type: ignore[union-attr]
+                Image.expires_at.isnot(None),  # type: ignore[union-attr]
+                Image.expires_at < now,  # type: ignore[operator]
+            )
+            expired_result = await session.exec(expired_stmt)
+            expired_images = list(expired_result.all())
+            result.expired = len(expired_images)
+
+            if not expired_images:
+                self.logger.info("No expired images to clean up")
+                return result
+
+            # Get currently displayed image IDs to protect
+            displayed_stmt = select(DeviceDisplayState.current_image_id).where(
+                DeviceDisplayState.current_image_id.isnot(None)  # type: ignore[union-attr]
+            )
+            displayed_result = await session.exec(displayed_stmt)
+            protected_ids: set[UUID] = {row for row in displayed_result.all() if row is not None}
+
+            self.logger.info(
+                "Found %d expired images, %d currently displayed (protected)",
+                len(expired_images),
+                len(protected_ids),
+            )
+
+            for image in expired_images:
+                if image.id in protected_ids:
+                    self.logger.debug("Skipping protected image %s (currently displayed)", image.id)
+                    result.protected += 1
+                    continue
+
+                # Delete DB record
+                await session.delete(image)
+
+                # Delete from MinIO
+                try:
+                    self.storage.delete_object(image.storage_path)
+                except Exception as e:
+                    result.storage_errors += 1
+                    self.logger.warning(
+                        "Failed to delete MinIO object %s for image %s: %s",
+                        image.storage_path,
+                        image.id,
+                        e,
+                    )
+
+                result.deleted += 1
+
+            await session.commit()
+
+        self.logger.info("Cleanup completed: %s", result)
+        return result
 
     async def _sync_job(self, job: ImmichSyncJob, max_uploads_remaining: int | None = None) -> SyncResult:
         """Execute a single sync job.
@@ -461,6 +529,12 @@ class ImmichSyncService:
             # Set processed dimensions (post-crop, what's actually stored in MinIO)
             image.original_width = processed_dimensions[0]
             image.original_height = processed_dimensions[1]
+
+            # Set expiration based on retention policy
+            if self.sync_config.retention_days > 0:
+                image.expires_at = image.created_at + timedelta(days=self.sync_config.retention_days)
+            else:
+                image.expires_at = None
 
             await session.commit()
             await session.refresh(image)

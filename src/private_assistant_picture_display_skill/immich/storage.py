@@ -99,6 +99,19 @@ class MinioStorageClient:
         self.logger.debug("Uploaded %s (%d bytes)", object_path, size)
         return object_path
 
+    def delete_object(self, object_path: str) -> None:
+        """Delete an object from MinIO.
+
+        Args:
+            object_path: Full path within bucket
+
+        Raises:
+            S3Error: If deletion fails
+
+        """
+        self._client.remove_object(self.config.bucket, object_path)
+        self.logger.debug("Deleted %s", object_path)
+
     def upload_from_bytes(
         self,
         object_path: str,
