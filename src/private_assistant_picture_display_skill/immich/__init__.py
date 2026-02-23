@@ -7,15 +7,13 @@ from private_assistant_picture_display_skill.immich.config import (
     ImmichSyncConfig,
     MinioWriterConfig,
 )
-from private_assistant_picture_display_skill.immich.sync_service import CleanupResult, ImmichSyncService, SyncResult
+from private_assistant_picture_display_skill.immich.sync_service import ImmichSyncService
 
 __all__ = [
-    "CleanupResult",
     "DeviceRequirements",
     "ImmichClient",
     "ImmichConnectionConfig",
     "ImmichSyncConfig",
     "ImmichSyncService",
     "MinioWriterConfig",
-    "SyncResult",
 ]

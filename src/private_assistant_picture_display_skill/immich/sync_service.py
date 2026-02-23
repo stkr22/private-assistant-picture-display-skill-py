@@ -54,11 +54,6 @@ class SyncResult:
     stopped_at_limit: bool = False  # True if total image limit was reached
     errors: list[str] = field(default_factory=list)
 
-    @property
-    def success(self) -> bool:
-        """Return True if no errors occurred."""
-        return len(self.errors) == 0
-
     def __str__(self) -> str:
         """Return human-readable summary."""
         limit_info = ", stopped_at_limit=True" if self.stopped_at_limit else ""
@@ -78,19 +73,12 @@ class CleanupResult:
     deleted: int = 0
     protected: int = 0  # Skipped because currently displayed
     storage_errors: int = 0  # DB deleted but MinIO deletion failed
-    errors: list[str] = field(default_factory=list)
-
-    @property
-    def success(self) -> bool:
-        """Return True if no errors occurred."""
-        return len(self.errors) == 0
 
     def __str__(self) -> str:
         """Return human-readable summary."""
         return (
             f"CleanupResult(expired={self.expired}, deleted={self.deleted}, "
-            f"protected={self.protected}, storage_errors={self.storage_errors}, "
-            f"errors={len(self.errors)})"
+            f"protected={self.protected}, storage_errors={self.storage_errors})"
         )
 
 
@@ -142,16 +130,9 @@ class ImmichSyncService:
             logger=logger,
         )
 
-    async def sync_all_active_jobs(self) -> dict[str, SyncResult]:
-        """Execute all active sync jobs from database.
-
-        Returns:
-            Dict mapping job name to SyncResult
-
-        """
-        results: dict[str, SyncResult] = {}
+    async def sync_all_active_jobs(self) -> None:
+        """Execute all active sync jobs from database."""
         total_uploads = 0  # Track uploads across all jobs in this run
-        self.last_cleanup_result: CleanupResult | None = None
 
         async with AsyncSession(self.engine) as session:
             stmt = select(ImmichSyncJob).where(ImmichSyncJob.is_active == sqlalchemy.true())
@@ -160,13 +141,13 @@ class ImmichSyncService:
 
         if not jobs:
             self.logger.warning("No active sync jobs found in database")
-            return results
+            return
 
         self.logger.info("Found %d active sync jobs", len(jobs))
 
         # Run cleanup before checking capacity (frees slots for new uploads)
         if self.sync_config.retention_days > 0:
-            self.last_cleanup_result = await self._cleanup_expired_images()
+            await self._cleanup_expired_images()
 
         # Check total image limit
         max_images = self.sync_config.max_images
@@ -186,11 +167,7 @@ class ImmichSyncService:
                     existing_count,
                     max_images,
                 )
-                for job in jobs:
-                    skip_result = SyncResult()
-                    skip_result.stopped_at_limit = True
-                    results[job.name] = skip_result
-                return results
+                return
 
         self.storage.ensure_bucket_exists()
 
@@ -205,9 +182,6 @@ class ImmichSyncService:
                             job.name,
                             max_images,
                         )
-                        skip_result = SyncResult()
-                        skip_result.stopped_at_limit = True
-                        results[job.name] = skip_result
                         continue
 
                 self.logger.info("Processing sync job: %s", job.name)
@@ -215,13 +189,9 @@ class ImmichSyncService:
                     # Calculate remaining uploads allowed for this job
                     max_uploads_remaining = max_images - existing_count - total_uploads if max_images > 0 else None
                     result = await self._sync_job(job, max_uploads_remaining=max_uploads_remaining)
-                    results[job.name] = result
                     total_uploads += result.downloaded
                     self.logger.info("Job '%s' completed: %s", job.name, result)
-                except Exception as e:
-                    error_result = SyncResult()
-                    error_result.errors.append(f"Job failed: {e}")
-                    results[job.name] = error_result
+                except Exception:
                     self.logger.exception("Job '%s' failed", job.name)
 
         if max_images > 0:
@@ -231,8 +201,6 @@ class ImmichSyncService:
                 existing_count + total_uploads,
                 max_images,
             )
-
-        return results
 
     async def _cleanup_expired_images(self) -> CleanupResult:
         """Remove expired Immich images from database and storage.

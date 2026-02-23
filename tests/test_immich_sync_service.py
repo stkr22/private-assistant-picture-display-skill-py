@@ -13,14 +13,6 @@ from private_assistant_picture_display_skill.models.image import Image
 
 
 class TestCleanupResult:
-    def test_success_with_no_errors(self) -> None:
-        result = CleanupResult(deleted=3)
-        assert result.success is True
-
-    def test_failure_with_errors(self) -> None:
-        result = CleanupResult(errors=["something broke"])
-        assert result.success is False
-
     def test_str_representation(self) -> None:
         result = CleanupResult(expired=5, deleted=3, protected=2, storage_errors=1)
         text = str(result)
@@ -35,8 +27,6 @@ class TestCleanupResult:
         assert result.deleted == 0
         assert result.protected == 0
         assert result.storage_errors == 0
-        assert result.errors == []
-        assert result.success is True
 
 
 class TestMinioStorageClientDelete:
@@ -166,7 +156,6 @@ class TestCleanupExpiredImages:
 
         assert result.expired == 0
         assert result.deleted == 0
-        assert result.success is True
 
     @pytest.mark.asyncio
     async def test_expired_images_deleted_from_db_and_minio(self) -> None:
@@ -354,13 +343,16 @@ class TestCleanupInSyncFlow:
         mock_jobs_result.all.return_value = []
         mock_session.exec = AsyncMock(return_value=mock_jobs_result)
 
-        with patch("private_assistant_picture_display_skill.immich.sync_service.AsyncSession") as mock_session_cls:
+        with (
+            patch("private_assistant_picture_display_skill.immich.sync_service.AsyncSession") as mock_session_cls,
+            patch.object(service, "_cleanup_expired_images", new_callable=AsyncMock) as mock_cleanup,
+        ):
             mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             await service.sync_all_active_jobs()
 
-        assert service.last_cleanup_result is None
+        mock_cleanup.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_cleanup_runs_when_retention_days_positive(self) -> None:
