@@ -146,6 +146,9 @@ async def run_immich_sync(dry_run: bool) -> int:
 
     results = await sync_service.sync_all_active_jobs()
 
+    if sync_service.last_cleanup_result:
+        logger.info("Cleanup: %s", sync_service.last_cleanup_result)
+
     # Return non-zero exit code if any job had errors
     has_errors = any(not r.success for r in results.values())
     return 1 if has_errors else 0
