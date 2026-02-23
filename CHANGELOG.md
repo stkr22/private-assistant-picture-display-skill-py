@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.6.0...v0.7.0) (2026-02-23)
+
+
+### Features
+
+* :recycle: add expires_at-based image retention to immich sync ([8681b6a](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/8681b6a46787b2ae8869f240ee9067fd64dd0c4f))
+
 ## [0.6.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.5.0...v0.6.0) (2026-01-31)
 
 
