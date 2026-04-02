@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.8.0...v0.9.0) (2026-04-02)
+
+
+### Features
+
+* :sparkles: rename minio_* fields to s3_* in RegistrationResponse ([8d8e22c](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/8d8e22c5efcf55b364762d3d90aabe354f231968))
+* :sparkles: rename minio_* fields to s3_* in RegistrationResponse ([36d650d](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/36d650dea9c419f7db6cd006fe72ca58e8049176))
+
 ## [0.8.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.7.0...v0.8.0) (2026-04-02)
 
 
