@@ -92,11 +92,11 @@ def sample_registration_response() -> RegistrationResponse:
     """Create a sample RegistrationResponse for testing."""
     return RegistrationResponse(
         status="registered",
-        minio_endpoint="localhost:9000",
-        minio_bucket="inky-images",
-        minio_access_key="test-access-key",
-        minio_secret_key="test-secret-key",
-        minio_secure=False,
+        s3_endpoint="localhost:9000",
+        s3_bucket="inky-images",
+        s3_access_key="test-access-key",
+        s3_secret_key="test-secret-key",
+        s3_secure=False,
     )
 
 
