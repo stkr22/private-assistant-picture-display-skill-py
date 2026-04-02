@@ -32,14 +32,14 @@ Uses the same MQTT broker as the internal communication.
 | `DEVICE_MQTT_USERNAME` | Device MQTT username | (optional, from secret) |
 | `DEVICE_MQTT_PASSWORD` | Device MQTT password | (optional, from secret) |
 
-### MinIO (Image Storage)
+### S3-Compatible Storage (Image Storage)
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `MINIO_ENDPOINT` | MinIO endpoint (host:port) | `minio.storage.svc:9000` |
-| `MINIO_BUCKET` | Bucket name for images | `inky-images` |
-| `MINIO_READER_ACCESS_KEY` | Read-only access key | (from secret) |
-| `MINIO_READER_SECRET_KEY` | Read-only secret key | (from secret) |
+| `S3_ENDPOINT` | S3 endpoint (host:port) | `garage.storage.svc:3900` |
+| `S3_BUCKET` | Bucket name for images | `inky-images` |
+| `S3_READER_ACCESS_KEY` | Read-only access key | (from secret) |
+| `S3_READER_SECRET_KEY` | Read-only secret key | (from secret) |
 
 ## Required Secrets
 
@@ -56,22 +56,22 @@ stringData:
   POSTGRES_PASSWORD: <password>
 ```
 
-### MinIO Credentials
+### S3 Credentials
 
 ```yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: picture-skill-minio
+  name: picture-skill-s3
 type: Opaque
 stringData:
-  MINIO_READER_ACCESS_KEY: <access-key>
-  MINIO_READER_SECRET_KEY: <secret-key>
+  S3_READER_ACCESS_KEY: <access-key>
+  S3_READER_SECRET_KEY: <secret-key>
 ```
 
 ## External Dependencies
 
-### MinIO Bucket
+### S3 Bucket
 
 Create bucket `inky-images` with:
 - Reader policy for skill to serve image URLs to devices
@@ -109,7 +109,7 @@ spec:
             - secretRef:
                 name: picture-skill-db
             - secretRef:
-                name: picture-skill-minio
+                name: picture-skill-s3
           env:
             - name: MQTT_HOST
               value: mosquitto.messaging.svc
@@ -119,9 +119,9 @@ spec:
               value: mosquitto.messaging.svc
             - name: DEVICE_MQTT_PORT
               value: "1883"
-            - name: MINIO_ENDPOINT
-              value: minio.storage.svc:9000
-            - name: MINIO_BUCKET
+            - name: S3_ENDPOINT
+              value: garage.storage.svc:3900
+            - name: S3_BUCKET
               value: inky-images
             - name: POSTGRES_HOST
               value: cnpg-cluster-rw.database.svc

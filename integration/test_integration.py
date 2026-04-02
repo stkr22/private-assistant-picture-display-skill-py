@@ -218,10 +218,10 @@ async def running_skill(
     os.environ["DEVICE_MQTT_PORT"] = str(mqtt_config["port"])
     os.environ["DEVICE_MQTT_USERNAME"] = ""
     os.environ["DEVICE_MQTT_PASSWORD"] = ""
-    os.environ["MINIO_ENDPOINT"] = "localhost:9000"
-    os.environ["MINIO_BUCKET"] = "inky-images"
-    os.environ["MINIO_READER_ACCESS_KEY"] = ""
-    os.environ["MINIO_READER_SECRET_KEY"] = ""
+    os.environ["S3_ENDPOINT"] = "localhost:9000"
+    os.environ["S3_BUCKET"] = "inky-images"
+    os.environ["S3_READER_ACCESS_KEY"] = ""
+    os.environ["S3_READER_SECRET_KEY"] = ""
 
     # Start skill as background task with config file path
     skill_task = asyncio.create_task(start_skill(skill_config_file))
@@ -410,10 +410,10 @@ async def rotation_test_setup(db_engine, skill_config_file, mqtt_config):
     os.environ["DEVICE_MQTT_PORT"] = str(mqtt_config["port"])
     os.environ["DEVICE_MQTT_USERNAME"] = ""
     os.environ["DEVICE_MQTT_PASSWORD"] = ""
-    os.environ["MINIO_ENDPOINT"] = "localhost:9000"
-    os.environ["MINIO_BUCKET"] = "inky-images"
-    os.environ["MINIO_READER_ACCESS_KEY"] = ""
-    os.environ["MINIO_READER_SECRET_KEY"] = ""
+    os.environ["S3_ENDPOINT"] = "localhost:9000"
+    os.environ["S3_BUCKET"] = "inky-images"
+    os.environ["S3_READER_ACCESS_KEY"] = ""
+    os.environ["S3_READER_SECRET_KEY"] = ""
 
     # Start skill as background task
     skill_task = asyncio.create_task(start_skill(skill_config_file))

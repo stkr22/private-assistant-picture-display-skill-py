@@ -37,6 +37,7 @@ class RegistrationResponse(BaseModel):
     minio_access_key: str = Field(description="Read-only access key")
     minio_secret_key: str = Field(description="Read-only secret key")
     minio_secure: bool = Field(default=False, description="Use HTTPS for MinIO")
+    minio_region: str | None = Field(default=None, description="S3 region")
 
 
 class DisplayCommand(BaseModel):

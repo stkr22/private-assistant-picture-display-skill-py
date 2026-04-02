@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     import aiomqtt
     from sqlalchemy.ext.asyncio import AsyncEngine
 
-from private_assistant_picture_display_skill.config import DeviceMqttConfig, MinioConfig, PictureSkillConfig
+from private_assistant_picture_display_skill.config import DeviceMqttConfig, PictureSkillConfig, S3Config
 from private_assistant_picture_display_skill.models.commands import (
     DeviceAcknowledge,
     DeviceRegistration,
@@ -85,10 +85,10 @@ class PictureSkill(BaseSkill):
         # Store skill-specific config
         self.skill_config = config_obj
 
-        # Load device MQTT and MinIO configs from environment
-        # AIDEV-NOTE: These use pydantic-settings with env prefixes (DEVICE_MQTT_*, MINIO_*)
+        # Load device MQTT and S3 configs from environment
+        # AIDEV-NOTE: These use pydantic-settings with env prefixes (DEVICE_MQTT_*, S3_*)
         self.device_mqtt_config = DeviceMqttConfig()
-        self.minio_config = MinioConfig()
+        self.s3_config = S3Config()
 
         # Configure supported intents with confidence thresholds
         self.supported_intents = {
@@ -255,11 +255,12 @@ class PictureSkill(BaseSkill):
         # Send registration response with MinIO credentials
         response = RegistrationResponse(
             status=status,  # type: ignore[arg-type]
-            minio_endpoint=self.minio_config.endpoint,
-            minio_bucket=self.minio_config.bucket,
-            minio_access_key=self.minio_config.reader_access_key,
-            minio_secret_key=self.minio_config.reader_secret_key,
-            minio_secure=self.minio_config.secure,
+            minio_endpoint=self.s3_config.endpoint,
+            minio_bucket=self.s3_config.bucket,
+            minio_access_key=self.s3_config.reader_access_key,
+            minio_secret_key=self.s3_config.reader_secret_key,
+            minio_secure=self.s3_config.secure,
+            minio_region=self.s3_config.region,
         )
         await self.device_mqtt.publish_registered(registration.device_id, response)
 

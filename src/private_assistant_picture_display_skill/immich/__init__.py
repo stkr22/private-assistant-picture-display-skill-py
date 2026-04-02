@@ -5,7 +5,7 @@ from private_assistant_picture_display_skill.immich.config import (
     DeviceRequirements,
     ImmichConnectionConfig,
     ImmichSyncConfig,
-    MinioWriterConfig,
+    S3WriterConfig,
 )
 from private_assistant_picture_display_skill.immich.sync_service import ImmichSyncService
 
@@ -15,5 +15,5 @@ __all__ = [
     "ImmichConnectionConfig",
     "ImmichSyncConfig",
     "ImmichSyncService",
-    "MinioWriterConfig",
+    "S3WriterConfig",
 ]

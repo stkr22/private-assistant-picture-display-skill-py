@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from private_assistant_picture_display_skill.config import DeviceMqttConfig, MinioConfig, PictureSkillConfig
+from private_assistant_picture_display_skill.config import DeviceMqttConfig, PictureSkillConfig, S3Config
 from private_assistant_picture_display_skill.models.commands import (
     DeviceAcknowledge,
     DeviceRegistration,
@@ -112,9 +112,9 @@ def device_mqtt_config() -> DeviceMqttConfig:
 
 
 @pytest.fixture
-def minio_config() -> MinioConfig:
-    """Create a MinioConfig for testing."""
-    return MinioConfig(
+def s3_config() -> S3Config:
+    """Create a S3Config for testing."""
+    return S3Config(
         endpoint="localhost:9000",
         bucket="inky-images",
         secure=False,

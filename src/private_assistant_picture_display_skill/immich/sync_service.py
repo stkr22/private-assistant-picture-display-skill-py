@@ -20,10 +20,10 @@ from private_assistant_picture_display_skill.immich.config import (
     DeviceRequirements,
     ImmichConnectionConfig,
     ImmichSyncConfig,
-    MinioWriterConfig,
+    S3WriterConfig,
 )
 from private_assistant_picture_display_skill.immich.models import ImmichAsset
-from private_assistant_picture_display_skill.immich.storage import MinioStorageClient
+from private_assistant_picture_display_skill.immich.storage import S3StorageClient
 from private_assistant_picture_display_skill.models.device import DeviceDisplayState
 from private_assistant_picture_display_skill.models.image import Image
 from private_assistant_picture_display_skill.models.immich_sync_job import ImmichSyncJob, SyncStrategy
@@ -72,7 +72,7 @@ class CleanupResult:
     expired: int = 0
     deleted: int = 0
     protected: int = 0  # Skipped because currently displayed
-    storage_errors: int = 0  # DB deleted but MinIO deletion failed
+    storage_errors: int = 0  # DB deleted but S3 deletion failed
 
     def __str__(self) -> str:
         """Return human-readable summary."""
@@ -90,7 +90,7 @@ class ImmichSyncService:
     2. For each job, fetch assets from Immich matching filters
     3. Apply client-side filters (orientation, dimensions, color)
     4. Download original file from Immich
-    5. Upload to MinIO with path: {prefix}/{asset_id}.{ext}
+    5. Upload to S3 with path: {prefix}/{asset_id}.{ext}
     6. Create/update Image record in PostgreSQL
     """
 
@@ -100,7 +100,7 @@ class ImmichSyncService:
         logger: logging.Logger,
         connection_config: ImmichConnectionConfig | None = None,
         sync_config: ImmichSyncConfig | None = None,
-        minio_config: MinioWriterConfig | None = None,
+        s3_config: S3WriterConfig | None = None,
     ) -> None:
         """Initialize sync service.
 
@@ -109,7 +109,7 @@ class ImmichSyncService:
             logger: Logger instance
             connection_config: Immich connection settings (defaults to env vars)
             sync_config: Global sync settings (defaults to env vars)
-            minio_config: MinIO writer config (defaults to env vars)
+            s3_config: S3 writer config (defaults to env vars)
 
         """
         self.engine = engine
@@ -118,15 +118,15 @@ class ImmichSyncService:
         # Load configs from environment if not provided
         self.connection_config = connection_config or ImmichConnectionConfig()
         self.sync_config = sync_config or ImmichSyncConfig()
-        self.minio_config = minio_config or MinioWriterConfig()
+        self.s3_config = s3_config or S3WriterConfig()
 
         # Initialize clients
         self.immich = ImmichClient(
             config=self.connection_config,
             logger=logger,
         )
-        self.storage = MinioStorageClient(
-            config=self.minio_config,
+        self.storage = S3StorageClient(
+            config=self.s3_config,
             logger=logger,
         )
 
@@ -252,13 +252,13 @@ class ImmichSyncService:
                 # Delete DB record
                 await session.delete(image)
 
-                # Delete from MinIO
+                # Delete from S3
                 try:
                     self.storage.delete_object(image.storage_path)
                 except Exception as e:
                     result.storage_errors += 1
                     self.logger.warning(
-                        "Failed to delete MinIO object %s for image %s: %s",
+                        "Failed to delete S3 object %s for image %s: %s",
                         image.storage_path,
                         image.id,
                         e,
@@ -437,9 +437,9 @@ class ImmichSyncService:
         target_height = device_reqs.height
         storage_path = f"{self.sync_config.storage_prefix}/{asset.id}.jpg"
 
-        # Check if already in MinIO (in case DB record was lost)
+        # Check if already in S3 (in case DB record was lost)
         if self.storage.object_exists(storage_path):
-            self.logger.debug("Object already in MinIO: %s", storage_path)
+            self.logger.debug("Object already in S3: %s", storage_path)
         else:
             # Download original
             self.logger.info("Downloading asset: %s", asset.id)
@@ -466,7 +466,7 @@ class ImmichSyncService:
                 return ProcessResult.SKIPPED_UNDERSIZED
             image_bytes = processed
 
-            # Upload to MinIO
+            # Upload to S3
             self.storage.upload_from_bytes(
                 object_path=storage_path,
                 data=image_bytes,
@@ -526,7 +526,7 @@ class ImmichSyncService:
             # Set/update metadata with natural language descriptions
             await self._populate_image_from_asset(image, asset)
 
-            # Set processed dimensions (post-crop, what's actually stored in MinIO)
+            # Set processed dimensions (post-crop, what's actually stored in S3)
             image.original_width = processed_dimensions[0]
             image.original_height = processed_dimensions[1]
 

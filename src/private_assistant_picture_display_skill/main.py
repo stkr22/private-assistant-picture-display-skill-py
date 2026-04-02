@@ -96,7 +96,7 @@ def immich_sync(
     Configuration is via environment variables:
     - IMMICH_BASE_URL: Immich server URL
     - IMMICH_API_KEY: API key for authentication
-    - MINIO_WRITER_*: MinIO connection for image storage
+    - S3_WRITER_*: S3-compatible connection for image storage
     - POSTGRES_*: Database connection (from commons)
     """
     asyncio.run(run_immich_sync(dry_run))

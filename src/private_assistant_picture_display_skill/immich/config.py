@@ -26,26 +26,28 @@ class ImmichConnectionConfig(BaseSettings):
     verify_ssl: bool = Field(default=True, description="Verify SSL certificates")
 
 
-class MinioWriterConfig(BaseSettings):
-    """MinIO configuration with write access for sync operations.
+class S3WriterConfig(BaseSettings):
+    """S3-compatible storage configuration with write access for sync operations.
 
-    Separate from MinioConfig (reader) to use different credentials.
+    Separate from S3Config (reader) to use different credentials.
 
     Environment variables:
-        MINIO_WRITER_ENDPOINT: MinIO server endpoint
-        MINIO_WRITER_BUCKET: Target bucket (default: inky-images)
-        MINIO_WRITER_SECURE: Use HTTPS (default: False)
-        MINIO_WRITER_ACCESS_KEY: Access key with write permissions
-        MINIO_WRITER_SECRET_KEY: Secret key with write permissions
+        S3_WRITER_ENDPOINT: S3 server endpoint
+        S3_WRITER_BUCKET: Target bucket (default: inky-images)
+        S3_WRITER_SECURE: Use HTTPS (default: False)
+        S3_WRITER_ACCESS_KEY: Access key with write permissions
+        S3_WRITER_SECRET_KEY: Secret key with write permissions
+        S3_WRITER_REGION: S3 region (default: us-east-1)
     """
 
-    model_config = SettingsConfigDict(env_prefix="MINIO_WRITER_")
+    model_config = SettingsConfigDict(env_prefix="S3_WRITER_")
 
-    endpoint: str = Field(description="MinIO server endpoint")
+    endpoint: str = Field(description="S3 server endpoint")
     bucket: str = Field(default="inky-images", description="Bucket for image storage")
-    secure: bool = Field(default=False, description="Use HTTPS for MinIO connection")
+    secure: bool = Field(default=False, description="Use HTTPS for S3 connection")
     access_key: str = Field(description="Access key with write permissions")
     secret_key: str = Field(description="Secret key with write permissions")
+    region: str | None = Field(default=None, description="S3 region (defaults to minio-py built-in)")
 
 
 class ImmichSyncConfig(BaseSettings):
@@ -54,7 +56,7 @@ class ImmichSyncConfig(BaseSettings):
     Per-job settings (filters, counts, etc.) are stored in ImmichSyncJob table.
 
     Environment variables:
-        IMMICH_STORAGE_PREFIX: MinIO path prefix (default: immich)
+        IMMICH_STORAGE_PREFIX: S3 path prefix (default: immich)
         IMMICH_SKIP_EXISTING: Skip already synced images (default: True)
         IMMICH_TARGET_WIDTH: Process images to this width
         IMMICH_TARGET_HEIGHT: Process images to this height
@@ -65,7 +67,7 @@ class ImmichSyncConfig(BaseSettings):
 
     storage_prefix: str = Field(
         default="immich",
-        description="MinIO path prefix for stored images",
+        description="S3 path prefix for stored images",
     )
     skip_existing: bool = Field(
         default=True,

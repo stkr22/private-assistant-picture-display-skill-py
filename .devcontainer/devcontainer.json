@@ -6,7 +6,8 @@
 	"remoteUser": "vscode",
     "features": {
         "ghcr.io/stkr22/devcontainer-features/claude-code:2.0.3": {},
-        "ghcr.io/stkr22/devcontainer-features/uv:1.0.0": {}
+        "ghcr.io/stkr22/devcontainer-features/uv:1.0.0": {},
+		"ghcr.io/devcontainer-community/devcontainer-features/starship.rs:1": {}
     },
 	"customizations": {
 		"vscode": {
