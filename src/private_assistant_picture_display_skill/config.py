@@ -23,24 +23,25 @@ class DeviceMqttConfig(BaseSettings):
     password: str = Field(description="Device MQTT password for authentication")
 
 
-class MinioConfig(BaseSettings):
-    """Configuration for MinIO image storage.
+class S3Config(BaseSettings):
+    """Configuration for S3-compatible image storage.
 
-    Loads from environment variables with MINIO_ prefix:
-    - MINIO_ENDPOINT (default: localhost:9000)
-    - MINIO_BUCKET (default: inky-images)
-    - MINIO_SECURE (default: false)
-    - MINIO_READER_ACCESS_KEY (required)
-    - MINIO_READER_SECRET_KEY (required)
+    Loads from environment variables with S3_ prefix:
+    - S3_ENDPOINT (default: localhost:9000)
+    - S3_BUCKET (default: inky-images)
+    - S3_SECURE (default: false)
+    - S3_READER_ACCESS_KEY (required)
+    - S3_READER_SECRET_KEY (required)
     """
 
-    model_config = SettingsConfigDict(env_prefix="MINIO_")
+    model_config = SettingsConfigDict(env_prefix="S3_")
 
-    endpoint: str = Field(description="MinIO server endpoint")
+    endpoint: str = Field(description="S3 server endpoint")
     bucket: str = Field(default="inky-images", description="Bucket for image storage")
-    secure: bool = Field(default=False, description="Use HTTPS for MinIO connection")
+    secure: bool = Field(default=False, description="Use HTTPS for S3 connection")
     reader_access_key: str = Field(description="Access key for device read access")
     reader_secret_key: str = Field(description="Secret key for device read access")
+    region: str | None = Field(default=None, description="S3 region (defaults to minio-py built-in)")
 
 
 class PictureSkillConfig(SkillConfig):

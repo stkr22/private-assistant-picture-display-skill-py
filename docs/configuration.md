@@ -45,11 +45,11 @@ External service credentials are loaded from environment variables using pydanti
 |--------|---------|-------------------|
 | `POSTGRES_*` | Database | `POSTGRES_HOST`, `POSTGRES_PASSWORD` |
 | `DEVICE_MQTT_*` | Device MQTT | `DEVICE_MQTT_HOST`, `DEVICE_MQTT_USERNAME` |
-| `MINIO_*` | Image Storage | `MINIO_ENDPOINT`, `MINIO_READER_ACCESS_KEY` |
+| `S3_*` | Image Storage | `S3_ENDPOINT`, `S3_READER_ACCESS_KEY` |
 
 ## Immich Sync Configuration
 
-The `immich-sync` command fetches images from Immich and stores them in MinIO.
+The `immich-sync` command fetches images from Immich and stores them in S3-compatible storage.
 Sync jobs are configured in the database via the `immich_sync_jobs` table.
 
 ### Usage
@@ -68,11 +68,12 @@ private-assistant-picture-display-skill immich-sync --dry-run
 |----------|----------|-------------|
 | `IMMICH_BASE_URL` | Yes | Immich server URL |
 | `IMMICH_API_KEY` | Yes | API key for authentication |
-| `MINIO_WRITER_ENDPOINT` | Yes | MinIO server endpoint |
-| `MINIO_WRITER_ACCESS_KEY` | Yes | MinIO access key |
-| `MINIO_WRITER_SECRET_KEY` | Yes | MinIO secret key |
-| `MINIO_WRITER_BUCKET` | No | Bucket name (default: `inky-images`) |
-| `MINIO_WRITER_SECURE` | No | Use HTTPS (default: `false`) |
+| `S3_WRITER_ENDPOINT` | Yes | S3-compatible server endpoint |
+| `S3_WRITER_ACCESS_KEY` | Yes | S3 access key |
+| `S3_WRITER_SECRET_KEY` | Yes | S3 secret key |
+| `S3_WRITER_BUCKET` | No | Bucket name (default: `inky-images`) |
+| `S3_WRITER_SECURE` | No | Use HTTPS (default: `false`) |
+| `S3_WRITER_REGION` | No | S3 region (default: `us-east-1`) |
 | `POSTGRES_*` | Yes | Database connection |
 
 ### Sync Job Configuration (Database)

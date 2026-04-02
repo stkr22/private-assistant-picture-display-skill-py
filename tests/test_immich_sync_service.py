@@ -6,8 +6,8 @@ import pytest
 from minio.error import S3Error
 from pydantic import ValidationError
 
-from private_assistant_picture_display_skill.immich.config import ImmichSyncConfig, MinioWriterConfig
-from private_assistant_picture_display_skill.immich.storage import MinioStorageClient
+from private_assistant_picture_display_skill.immich.config import ImmichSyncConfig, S3WriterConfig
+from private_assistant_picture_display_skill.immich.storage import S3StorageClient
 from private_assistant_picture_display_skill.immich.sync_service import CleanupResult, ImmichSyncService
 from private_assistant_picture_display_skill.models.image import Image
 
@@ -29,9 +29,9 @@ class TestCleanupResult:
         assert result.storage_errors == 0
 
 
-class TestMinioStorageClientDelete:
+class TestS3StorageClientDelete:
     def test_delete_object_calls_remove(self) -> None:
-        config = MinioWriterConfig(
+        config = S3WriterConfig(
             endpoint="localhost:9000",
             bucket="test-bucket",
             secure=False,
@@ -39,7 +39,7 @@ class TestMinioStorageClientDelete:
             secret_key="test-secret",
         )
         logger = MagicMock()
-        client = MinioStorageClient(config=config, logger=logger)
+        client = S3StorageClient(config=config, logger=logger)
         client._client = MagicMock()
 
         client.delete_object("immich/test-asset.jpg")
@@ -47,7 +47,7 @@ class TestMinioStorageClientDelete:
         client._client.remove_object.assert_called_once_with("test-bucket", "immich/test-asset.jpg")
 
     def test_delete_object_propagates_s3_error(self) -> None:
-        config = MinioWriterConfig(
+        config = S3WriterConfig(
             endpoint="localhost:9000",
             bucket="test-bucket",
             secure=False,
@@ -55,7 +55,7 @@ class TestMinioStorageClientDelete:
             secret_key="test-secret",
         )
         logger = MagicMock()
-        client = MinioStorageClient(config=config, logger=logger)
+        client = S3StorageClient(config=config, logger=logger)
         client._client = MagicMock()
         mock_response = MagicMock()
         mock_response.status = 404
@@ -106,7 +106,7 @@ class TestCleanupExpiredImages:
             _env_file=None,
             retention_days=retention_days,
         )
-        minio_config = MinioWriterConfig(
+        s3_config = S3WriterConfig(
             endpoint="localhost:9000",
             bucket="test-bucket",
             secure=False,
@@ -119,7 +119,7 @@ class TestCleanupExpiredImages:
                 logger=logger,
                 connection_config=MagicMock(),
                 sync_config=sync_config,
-                minio_config=minio_config,
+                s3_config=s3_config,
             )
         service.storage = MagicMock()
         return service
@@ -316,7 +316,7 @@ class TestCleanupInSyncFlow:
             retention_days=retention_days,
             max_images=20,
         )
-        minio_config = MinioWriterConfig(
+        s3_config = S3WriterConfig(
             endpoint="localhost:9000",
             bucket="test-bucket",
             secure=False,
@@ -329,7 +329,7 @@ class TestCleanupInSyncFlow:
                 logger=logger,
                 connection_config=MagicMock(),
                 sync_config=sync_config,
-                minio_config=minio_config,
+                s3_config=s3_config,
             )
         service.storage = MagicMock()
         return service
@@ -393,7 +393,7 @@ async def test_cleanup_called_before_capacity_check() -> None:
         retention_days=7,
         max_images=5,
     )
-    minio_config = MinioWriterConfig(
+    s3_config = S3WriterConfig(
         endpoint="localhost:9000",
         bucket="test-bucket",
         secure=False,
@@ -406,7 +406,7 @@ async def test_cleanup_called_before_capacity_check() -> None:
             logger=logger,
             connection_config=MagicMock(),
             sync_config=sync_config,
-            minio_config=minio_config,
+            s3_config=s3_config,
         )
     service.storage = MagicMock()
 

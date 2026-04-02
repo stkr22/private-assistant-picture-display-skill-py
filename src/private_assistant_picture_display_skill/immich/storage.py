@@ -1,4 +1,4 @@
-"""MinIO storage utilities for Immich sync."""
+"""S3-compatible storage utilities for Immich sync."""
 
 import logging
 from collections.abc import AsyncIterator
@@ -7,11 +7,11 @@ from io import BytesIO
 from minio import Minio
 from minio.error import S3Error
 
-from private_assistant_picture_display_skill.immich.config import MinioWriterConfig
+from private_assistant_picture_display_skill.immich.config import S3WriterConfig
 
 
-class MinioStorageClient:
-    """MinIO client for uploading images.
+class S3StorageClient:
+    """S3-compatible storage client for uploading images.
 
     Wraps the synchronous minio-py library.
     AIDEV-NOTE: minio-py is synchronous; consider running in executor for large uploads.
@@ -19,13 +19,13 @@ class MinioStorageClient:
 
     def __init__(
         self,
-        config: MinioWriterConfig,
+        config: S3WriterConfig,
         logger: logging.Logger,
     ) -> None:
-        """Initialize MinIO client.
+        """Initialize S3 client.
 
         Args:
-            config: MinIO configuration with write credentials
+            config: S3 configuration with write credentials
             logger: Logger instance
 
         """
@@ -36,6 +36,7 @@ class MinioStorageClient:
             access_key=config.access_key,
             secret_key=config.secret_key,
             secure=config.secure,
+            region=config.region if config.region is not None else "",
         )
 
     def ensure_bucket_exists(self) -> None:
@@ -45,7 +46,7 @@ class MinioStorageClient:
             self.logger.info("Created bucket: %s", self.config.bucket)
 
     def object_exists(self, object_path: str) -> bool:
-        """Check if an object already exists in MinIO.
+        """Check if an object already exists in S3.
 
         Args:
             object_path: Full path within bucket
@@ -100,7 +101,7 @@ class MinioStorageClient:
         return object_path
 
     def delete_object(self, object_path: str) -> None:
-        """Delete an object from MinIO.
+        """Delete an object from S3.
 
         Args:
             object_path: Full path within bucket
