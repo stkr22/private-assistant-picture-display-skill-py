@@ -104,7 +104,7 @@ class DeviceMqttClient:
         self.logger.debug("Published command to %s: %s", topic, command.action)
 
     async def publish_registered(self, device_id: str, response: RegistrationResponse) -> None:
-        """Send registration confirmation with MinIO credentials.
+        """Send registration confirmation with S3 credentials.
 
         Args:
             device_id: Device that registered

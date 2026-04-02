@@ -255,12 +255,12 @@ class PictureSkill(BaseSkill):
         # Send registration response with MinIO credentials
         response = RegistrationResponse(
             status=status,  # type: ignore[arg-type]
-            minio_endpoint=self.s3_config.endpoint,
-            minio_bucket=self.s3_config.bucket,
-            minio_access_key=self.s3_config.reader_access_key,
-            minio_secret_key=self.s3_config.reader_secret_key,
-            minio_secure=self.s3_config.secure,
-            minio_region=self.s3_config.region,
+            s3_endpoint=self.s3_config.endpoint,
+            s3_bucket=self.s3_config.bucket,
+            s3_access_key=self.s3_config.reader_access_key,
+            s3_secret_key=self.s3_config.reader_secret_key,
+            s3_secure=self.s3_config.secure,
+            s3_region=self.s3_config.region,
         )
         await self.device_mqtt.publish_registered(registration.device_id, response)
 
