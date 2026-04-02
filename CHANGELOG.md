@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.7.0...v0.8.0) (2026-04-02)
+
+
+### Features
+
+* :sparkles: add configurable S3 region and rename Minio* to S3* ([8e0f492](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/8e0f492a7081465f213f7c1382643f6805a227ba))
+
 ## [0.7.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.6.0...v0.7.0) (2026-02-23)
 
 
