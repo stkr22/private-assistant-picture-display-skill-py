@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.1](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.11.0...v0.11.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* :bug: swap dimensions for portrait devices in image selection and sync ([9ebbb80](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/9ebbb8004ea42dfbfa82dfddbda2b36e3d2c961e))
+* :bug: swap dimensions for portrait devices in image selection and sync ([4737bf4](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/4737bf4281158068f12b829fc104c00cc9379f9d))
+
 ## [0.11.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.10.0...v0.11.0) (2026-04-11)
 
 
