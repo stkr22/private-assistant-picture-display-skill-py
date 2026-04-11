@@ -39,6 +39,7 @@ class ProcessResult(Enum):
     SKIPPED_EXISTING = auto()
     SKIPPED_UNDERSIZED = auto()
     SKIPPED_COLOR_MISMATCH = auto()
+    SKIPPED_LOW_VIBRANCY = auto()
 
 
 @dataclass
@@ -51,6 +52,7 @@ class SyncResult:
     skipped_existing: int = 0
     skipped_undersized: int = 0  # Too small for target dimensions
     skipped_color_mismatch: int = 0  # Color profile incompatible
+    skipped_low_vibrancy: int = 0  # Low saturation and contrast
     stopped_at_limit: bool = False  # True if total image limit was reached
     errors: list[str] = field(default_factory=list)
 
@@ -61,7 +63,8 @@ class SyncResult:
             f"SyncResult(fetched={self.fetched}, filtered={self.filtered}, "
             f"downloaded={self.downloaded}, skipped_existing={self.skipped_existing}, "
             f"skipped_undersized={self.skipped_undersized}, "
-            f"skipped_color={self.skipped_color_mismatch}, errors={len(self.errors)}{limit_info})"
+            f"skipped_color={self.skipped_color_mismatch}, "
+            f"skipped_vibrancy={self.skipped_low_vibrancy}, errors={len(self.errors)}{limit_info})"
         )
 
 
@@ -363,6 +366,8 @@ class ImmichSyncService:
             result.skipped_undersized += 1
         elif process_result == ProcessResult.SKIPPED_COLOR_MISMATCH:
             result.skipped_color_mismatch += 1
+        elif process_result == ProcessResult.SKIPPED_LOW_VIBRANCY:
+            result.skipped_low_vibrancy += 1
 
     async def _get_device_requirements(self, device_id: UUID) -> DeviceRequirements:
         """Get display requirements from global device table.
@@ -457,6 +462,15 @@ class ImmichSyncService:
                     self.logger.info("Skipping asset %s: color score %.2f < %.2f", asset.id, score, min_score)
                     return ProcessResult.SKIPPED_COLOR_MISMATCH
                 self.logger.debug("Asset %s color score: %.2f", asset.id, score)
+
+            # Check vibrancy (saturation/contrast) for e-ink suitability
+            min_vibrancy = job.min_vibrancy_score
+            if min_vibrancy > 0:
+                vibrancy = ColorProfileAnalyzer.calculate_vibrancy_score(image_bytes)
+                if vibrancy < min_vibrancy:
+                    self.logger.info("Skipping asset %s: vibrancy score %.2f < %.2f", asset.id, vibrancy, min_vibrancy)
+                    return ProcessResult.SKIPPED_LOW_VIBRANCY
+                self.logger.debug("Asset %s vibrancy score: %.2f", asset.id, vibrancy)
 
             # Process to target dimensions
             self.logger.debug("Processing image to %dx%d", target_width, target_height)

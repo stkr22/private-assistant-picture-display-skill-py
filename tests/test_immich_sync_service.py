@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -10,7 +11,12 @@ from pydantic import ValidationError
 from private_assistant_picture_display_skill.immich.config import DeviceRequirements, ImmichSyncConfig, S3WriterConfig
 from private_assistant_picture_display_skill.immich.models import ImmichAsset, ImmichExifInfo
 from private_assistant_picture_display_skill.immich.storage import S3StorageClient
-from private_assistant_picture_display_skill.immich.sync_service import CleanupResult, ImmichSyncService
+from private_assistant_picture_display_skill.immich.sync_service import (
+    CleanupResult,
+    ImmichSyncService,
+    ProcessResult,
+    SyncResult,
+)
 from private_assistant_picture_display_skill.models.image import Image
 from private_assistant_picture_display_skill.models.immich_sync_job import ImmichSyncJob
 
@@ -633,3 +639,156 @@ class TestFilterAssets:
         ]
         result = service._filter_assets(assets, self._make_job(), self._landscape_reqs())
         assert len(result) == 1  # Uses top-level (landscape) -> passes landscape filter
+
+
+class TestVibrancyFiltering:
+    """Test vibrancy score filtering in _process_asset and result counters."""
+
+    def _make_service(self) -> ImmichSyncService:
+        with patch("private_assistant_picture_display_skill.immich.sync_service.ImmichClient"):
+            service = ImmichSyncService(
+                engine=MagicMock(),
+                logger=MagicMock(),
+                connection_config=MagicMock(),
+                sync_config=ImmichSyncConfig(_env_file=None),
+                s3_config=S3WriterConfig(
+                    endpoint="localhost:9000",
+                    bucket="test",
+                    secure=False,
+                    access_key="k",
+                    secret_key="s",
+                ),
+            )
+        service.storage = MagicMock()
+        service.storage.object_exists.return_value = False
+        return service
+
+    def _make_asset(self) -> ImmichAsset:
+        return ImmichAsset(
+            id="test-asset",
+            type="IMAGE",
+            original_file_name="test.jpg",
+            original_mime_type="image/jpeg",
+            checksum="abc",
+            file_created_at=datetime.now(),
+            width=4000,
+            height=3000,
+        )
+
+    def _make_job(self, min_vibrancy: float = 0.0, min_color: float = 0.0) -> ImmichSyncJob:
+        return ImmichSyncJob(
+            name="test-job",
+            target_device_id=uuid4(),
+            min_vibrancy_score=min_vibrancy,
+            min_color_score=min_color,
+        )
+
+    def _landscape_reqs(self) -> DeviceRequirements:
+        return DeviceRequirements(width=1920, height=1080, orientation="landscape")
+
+    @pytest.mark.asyncio
+    async def test_vibrancy_skip_below_threshold(self) -> None:
+        """Asset with low vibrancy score is skipped."""
+        service = self._make_service()
+        service.immich = MagicMock()
+
+        async def fake_stream() -> AsyncIterator[bytes]:
+            yield b"fake-image-data"
+
+        service.immich.download_original = MagicMock(return_value=fake_stream())
+
+        with (
+            patch.object(service, "_find_existing_image", new_callable=AsyncMock, return_value=None),
+            patch(
+                "private_assistant_picture_display_skill.immich.sync_service.ColorProfileAnalyzer"
+                ".calculate_compatibility_score",
+                return_value=0.8,
+            ),
+            patch(
+                "private_assistant_picture_display_skill.immich.sync_service.ColorProfileAnalyzer"
+                ".calculate_vibrancy_score",
+                return_value=0.1,
+            ),
+        ):
+            result = await service._process_asset(
+                self._make_asset(), self._make_job(min_vibrancy=0.3, min_color=0.5), self._landscape_reqs()
+            )
+
+        assert result == ProcessResult.SKIPPED_LOW_VIBRANCY
+
+    @pytest.mark.asyncio
+    async def test_vibrancy_pass_above_threshold(self) -> None:
+        """Asset with sufficient vibrancy score passes."""
+        service = self._make_service()
+        service.immich = MagicMock()
+
+        async def fake_stream() -> AsyncIterator[bytes]:
+            yield b"fake-image-data"
+
+        service.immich.download_original = MagicMock(return_value=fake_stream())
+
+        with (
+            patch.object(service, "_find_existing_image", new_callable=AsyncMock, return_value=None),
+            patch(
+                "private_assistant_picture_display_skill.immich.sync_service.ColorProfileAnalyzer"
+                ".calculate_compatibility_score",
+                return_value=0.8,
+            ),
+            patch(
+                "private_assistant_picture_display_skill.immich.sync_service.ColorProfileAnalyzer"
+                ".calculate_vibrancy_score",
+                return_value=0.5,
+            ),
+            patch(
+                "private_assistant_picture_display_skill.immich.sync_service.ImageProcessor.process_for_display",
+                return_value=b"processed-image",
+            ),
+            patch.object(service, "_upsert_image_record", new_callable=AsyncMock),
+        ):
+            result = await service._process_asset(
+                self._make_asset(), self._make_job(min_vibrancy=0.3, min_color=0.5), self._landscape_reqs()
+            )
+
+        assert result == ProcessResult.DOWNLOADED
+
+    @pytest.mark.asyncio
+    async def test_vibrancy_disabled_when_zero(self) -> None:
+        """Vibrancy check is skipped when min_vibrancy_score is 0.0."""
+        service = self._make_service()
+        service.immich = MagicMock()
+
+        async def fake_stream() -> AsyncIterator[bytes]:
+            yield b"fake-image-data"
+
+        service.immich.download_original = MagicMock(return_value=fake_stream())
+
+        with (
+            patch.object(service, "_find_existing_image", new_callable=AsyncMock, return_value=None),
+            patch(
+                "private_assistant_picture_display_skill.immich.sync_service.ColorProfileAnalyzer"
+                ".calculate_vibrancy_score",
+            ) as mock_vibrancy,
+            patch(
+                "private_assistant_picture_display_skill.immich.sync_service.ImageProcessor.process_for_display",
+                return_value=b"processed-image",
+            ),
+            patch.object(service, "_upsert_image_record", new_callable=AsyncMock),
+        ):
+            result = await service._process_asset(
+                self._make_asset(), self._make_job(min_vibrancy=0.0, min_color=0.0), self._landscape_reqs()
+            )
+
+        assert result == ProcessResult.DOWNLOADED
+        mock_vibrancy.assert_not_called()
+
+    def test_update_result_counters_vibrancy(self) -> None:
+        """SKIPPED_LOW_VIBRANCY increments the correct counter."""
+        result = SyncResult()
+        ImmichSyncService._update_result_counters(result, ProcessResult.SKIPPED_LOW_VIBRANCY)
+        assert result.skipped_low_vibrancy == 1
+
+    def test_sync_result_str_includes_vibrancy(self) -> None:
+        """SyncResult __str__ includes vibrancy counter."""
+        result = SyncResult(skipped_low_vibrancy=3)
+        text = str(result)
+        assert "skipped_vibrancy=3" in text
