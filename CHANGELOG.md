@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.12.0...v0.12.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* :bug: use top-level asset dimensions for orientation filtering ([075fc0a](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/075fc0a0c0ba01ef911156055fea76dbf780cbcb))
+* :bug: use top-level asset dimensions for orientation filtering ([55ae469](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/55ae4693e52e26d12b2da7f37c16a8dd67fb7bf5))
+
 ## [0.12.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.11.1...v0.12.0) (2026-04-11)
 
 
