@@ -622,14 +622,15 @@ class ImmichSyncService:
         filtered: list[ImmichAsset] = []
 
         for asset in assets:
-            if not asset.exif_info:
-                self.logger.debug("Skipping asset %s: no EXIF data", asset.id)
-                continue
-
-            width = asset.exif_info.exif_image_width
-            height = asset.exif_info.exif_image_height
+            # Use top-level dimensions (available on all API endpoints),
+            # fall back to EXIF dimensions for older Immich versions
+            width = asset.width
+            height = asset.height
+            if (not width or not height) and asset.exif_info:
+                width = asset.exif_info.exif_image_width
+                height = asset.exif_info.exif_image_height
             if not width or not height:
-                self.logger.debug("Skipping asset %s: missing dimensions in EXIF", asset.id)
+                self.logger.debug("Skipping asset %s: missing dimensions", asset.id)
                 continue
 
             # Orientation check from device requirements
