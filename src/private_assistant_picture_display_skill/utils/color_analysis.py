@@ -83,20 +83,26 @@ class ColorProfileAnalyzer:
         score = max(0.0, 1.0 - (weighted_distance / 50.0))
         return round(score, 3)
 
+    # Contrast contributes as a secondary signal to vibrancy.
+    # Saturation is the primary indicator of e-ink suitability; contrast
+    # provides a bonus so that images with decent tonal range score slightly
+    # higher, but cannot rescue a desaturated image on its own.
+    _CONTRAST_WEIGHT: ClassVar[float] = 0.3
+
     @classmethod
     def calculate_vibrancy_score(cls, image_data: bytes) -> float:
         """Score image vibrancy for e-ink display suitability.
 
-        Combines saturation and contrast into a single score. An image
-        passes if it has EITHER good saturation OR good contrast, so
-        high-contrast B&W photos score well despite zero saturation.
+        Saturation is the primary signal — desaturated images look muddy on
+        Spectra 6 e-ink regardless of contrast. Contrast acts as a weighted
+        bonus so that saturated images with good tonal range score higher.
 
         Algorithm:
         1. Resize image to 100x100 for speed
         2. Convert to HSV color space
         3. Saturation score: mean S of mid-brightness pixels (V 20-240)
         4. Contrast score: percentile-based dynamic range of V channel
-        5. Return max(saturation, contrast) as vibrancy
+        5. Return sat + 0.3 * contrast (capped at 1.0)
 
         Args:
             image_data: Image bytes (JPEG, PNG, HEIC, etc.)
@@ -131,4 +137,4 @@ class ColorProfileAnalyzer:
         p95 = v_sorted[n * 95 // 100]
         contrast_score = (p95 - p5) / 255.0
 
-        return round(max(sat_score, contrast_score), 3)
+        return round(min(sat_score + cls._CONTRAST_WEIGHT * contrast_score, 1.0), 3)
