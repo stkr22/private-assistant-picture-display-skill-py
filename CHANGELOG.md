@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.12.1...v0.13.0) (2026-04-11)
+
+
+### Features
+
+* :sparkles: add vibrancy filter to reject dull/dark images for e-ink ([daab419](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/daab419f73a9a9c94257bf942a19805c6849cc34))
+* :sparkles: add vibrancy filter to reject dull/dark images for e-ink ([c7169ce](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/c7169ce4ab9506597b9a7b66f66e507d3f053ece))
+
 ## [0.12.1](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.12.0...v0.12.1) (2026-04-11)
 
 
