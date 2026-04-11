@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.1](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.13.0...v0.13.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* :bug: use weighted formula for vibrancy score instead of max ([04bdfc3](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/04bdfc33c9ef0de6749051e6b5c9ac8d2661c72f))
+* :bug: use weighted formula for vibrancy score instead of max ([e259717](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/e25971723596e6e20e045244415161c500dd151b))
+
 ## [0.13.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.12.1...v0.13.0) (2026-04-11)
 
 
