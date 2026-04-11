@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.9.0...v0.10.0) (2026-04-11)
+
+
+### Features
+
+* :sparkles: refresh all devices in a room on next picture command ([fdbe141](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/fdbe141b232c1517d47267a29963a78334a317f7))
+
+
+### Bug Fixes
+
+* :sparkles: add workspaceFolder configuration to development container ([b365054](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/b36505416945f147fc8cb948982cb1d6683e5db3))
+* :wrench: correct devcontainer volume mount and workspaceFolder ([ac08778](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/ac08778108895ad86ee2b24111a37bb957adcdba))
+
 ## [0.9.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.8.0...v0.9.0) (2026-04-02)
 
 
