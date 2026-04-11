@@ -14,6 +14,11 @@ class ColorProfileAnalyzer:
     Uses Delta E (CIE76) for perceptual color distance calculation.
     """
 
+    # Brightness thresholds for saturation analysis (HSV V channel, 0-255)
+    # S is meaningless at V~0 (black) or V~255 (white) — exclude from saturation mean
+    _V_LOW_THRESHOLD: ClassVar[int] = 20
+    _V_HIGH_THRESHOLD: ClassVar[int] = 240
+
     # Spectra 6 palette - measured values from actual display
     # Source: https://forums.pimoroni.com/t/what-rgb-colors-are-you-using-for-the-colors-on-the-impression-spectra-6/27942
     SPECTRA_6_PALETTE: ClassVar[list[Color]] = [
@@ -77,3 +82,53 @@ class ColorProfileAnalyzer:
         # Divide by 50 to normalize (typical "bad" images score ~30-50)
         score = max(0.0, 1.0 - (weighted_distance / 50.0))
         return round(score, 3)
+
+    @classmethod
+    def calculate_vibrancy_score(cls, image_data: bytes) -> float:
+        """Score image vibrancy for e-ink display suitability.
+
+        Combines saturation and contrast into a single score. An image
+        passes if it has EITHER good saturation OR good contrast, so
+        high-contrast B&W photos score well despite zero saturation.
+
+        Algorithm:
+        1. Resize image to 100x100 for speed
+        2. Convert to HSV color space
+        3. Saturation score: mean S of mid-brightness pixels (V 20-240)
+        4. Contrast score: percentile-based dynamic range of V channel
+        5. Return max(saturation, contrast) as vibrancy
+
+        Args:
+            image_data: Image bytes (JPEG, PNG, HEIC, etc.)
+
+        Returns:
+            Vibrancy score 0.0-1.0 (1.0 = highly vibrant or contrasty)
+
+        """
+        with Image.open(BytesIO(image_data)) as img:
+            resized = img.convert("RGB").resize((100, 100))
+            hsv_img = resized.convert("HSV")
+            raw = hsv_img.tobytes()
+
+        # HSV bytes: H, S, V triples for each pixel
+        s_values = [raw[i + 1] for i in range(0, len(raw), 3)]
+        v_values = [raw[i + 2] for i in range(0, len(raw), 3)]
+
+        # Saturation score: mean S of pixels with mid-range brightness
+        # (S is meaningless at V~0 or V~255 — black/white have arbitrary S)
+        mid_brightness_s = [
+            s for s, v in zip(s_values, v_values, strict=True) if cls._V_LOW_THRESHOLD < v < cls._V_HIGH_THRESHOLD
+        ]
+        if len(mid_brightness_s) >= len(s_values) // 10:
+            sat_score = sum(mid_brightness_s) / (len(mid_brightness_s) * 255.0)
+        else:
+            sat_score = 0.0
+
+        # Contrast score: percentile-based dynamic range of V channel
+        v_sorted = sorted(v_values)
+        n = len(v_sorted)
+        p5 = v_sorted[n * 5 // 100]
+        p95 = v_sorted[n * 95 // 100]
+        contrast_score = (p95 - p5) / 255.0
+
+        return round(max(sat_score, contrast_score), 3)
