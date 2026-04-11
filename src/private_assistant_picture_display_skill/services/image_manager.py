@@ -64,11 +64,16 @@ class ImageManager:
         attrs = device.device_attributes or {}
         display_width = attrs.get("display_width")
         display_height = attrs.get("display_height")
+        orientation = attrs.get("orientation", "landscape")
 
         # Device must have both dimensions set
         if display_width is None or display_height is None:
             self.logger.warning("Device %s missing display dimensions, skipping", device.name)
             return None
+
+        # Portrait devices need swapped dimensions (panel is physically rotated)
+        if orientation == "portrait":
+            display_width, display_height = display_height, display_width
 
         async with AsyncSession(self.engine) as session:
             # Build query - require exact dimension match

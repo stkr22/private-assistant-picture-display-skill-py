@@ -37,7 +37,7 @@ from private_assistant_commons import (
     IntentType,
     create_skill_engine,
 )
-from private_assistant_commons.database import DeviceType, GlobalDevice, Skill
+from private_assistant_commons.database import DeviceType, GlobalDevice, Room, Skill
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -479,3 +479,435 @@ class TestAutomaticRotation:
         assert command_received, "Did not receive DisplayCommand within timeout"
         # The next image (never displayed) should be selected
         assert received_image_id == str(next_image_id), f"Expected image {next_image_id}, got {received_image_id}"
+
+
+@pytest.fixture
+async def room_devices_test_setup(db_engine, skill_config_file, mqtt_config):
+    """Set up multiple devices in a room for testing room-based next picture.
+
+    Creates a room with two online devices and enough images for each device,
+    then starts the skill. Uses a single session to avoid session sharing issues.
+    """
+    async with AsyncSession(db_engine) as session:
+        # Create images (enough for both devices)
+        image_a = Image(
+            id=uuid.uuid4(),
+            source_name="manual",
+            storage_path="manual/image-a.jpg",
+            title="Image A",
+            description="First test image",
+            original_width=1600,
+            original_height=1200,
+            display_duration_seconds=60,
+            created_at=datetime.now() - timedelta(days=2),
+            last_displayed_at=None,
+        )
+        session.add(image_a)
+
+        image_b = Image(
+            id=uuid.uuid4(),
+            source_name="manual",
+            storage_path="manual/image-b.jpg",
+            title="Image B",
+            description="Second test image",
+            original_width=1600,
+            original_height=1200,
+            display_duration_seconds=60,
+            created_at=datetime.now() - timedelta(days=1),
+            last_displayed_at=None,
+        )
+        session.add(image_b)
+
+        # Create DeviceType and Skill
+        device_type = DeviceType(name="picture_display")
+        session.add(device_type)
+
+        skill_record = Skill(name="picture-display-skill-integration-test")
+        session.add(skill_record)
+
+        # Create room
+        room = Room(name="test-room")
+        session.add(room)
+
+        await session.commit()
+        await session.refresh(device_type)
+        await session.refresh(skill_record)
+        await session.refresh(room)
+
+        # Capture IDs before they expire
+        device_type_id = device_type.id
+        skill_record_id = skill_record.id
+        room_id = room.id
+
+        # Create two devices in the same room
+        device_1_id = uuid.uuid4()
+        device_1 = GlobalDevice(
+            id=device_1_id,
+            device_type_id=device_type_id,
+            skill_id=skill_record_id,
+            room_id=room_id,
+            name="inky-room-1",
+            pattern=["inky-room-1", "inky-room-1 display"],
+            device_attributes={
+                "display_width": 1600,
+                "display_height": 1200,
+                "orientation": "landscape",
+                "model": "impression-13.3-spectra6",
+            },
+        )
+        session.add(device_1)
+
+        device_2_id = uuid.uuid4()
+        device_2 = GlobalDevice(
+            id=device_2_id,
+            device_type_id=device_type_id,
+            skill_id=skill_record_id,
+            room_id=room_id,
+            name="inky-room-2",
+            pattern=["inky-room-2", "inky-room-2 display"],
+            device_attributes={
+                "display_width": 1600,
+                "display_height": 1200,
+                "orientation": "landscape",
+                "model": "impression-13.3-spectra6",
+            },
+        )
+        session.add(device_2)
+
+        # Create display states (both online)
+        display_state_1 = DeviceDisplayState(global_device_id=device_1_id, is_online=True)
+        session.add(display_state_1)
+
+        display_state_2 = DeviceDisplayState(global_device_id=device_2_id, is_online=True)
+        session.add(display_state_2)
+
+        await session.commit()
+
+    device_names = ["inky-room-1", "inky-room-2"]
+
+    # Give database time to persist
+    await asyncio.sleep(0.5)
+
+    # Set environment variables
+    os.environ["MQTT_HOST"] = mqtt_config["host"]
+    os.environ["MQTT_PORT"] = str(mqtt_config["port"])
+    os.environ["DEVICE_MQTT_HOST"] = mqtt_config["host"]
+    os.environ["DEVICE_MQTT_PORT"] = str(mqtt_config["port"])
+    os.environ["DEVICE_MQTT_USERNAME"] = ""
+    os.environ["DEVICE_MQTT_PASSWORD"] = ""
+    os.environ["S3_ENDPOINT"] = "localhost:9000"
+    os.environ["S3_BUCKET"] = "inky-images"
+    os.environ["S3_READER_ACCESS_KEY"] = ""
+    os.environ["S3_READER_SECRET_KEY"] = ""
+
+    # Start skill as background task
+    skill_task = asyncio.create_task(start_skill(skill_config_file))
+
+    # Wait for skill to initialize
+    await asyncio.sleep(3)
+
+    yield {"device_names": device_names, "room_name": "test-room"}
+
+    # Cleanup
+    skill_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await skill_task
+
+
+class TestRoomNextPicture:
+    """Test next picture command sends DisplayCommand to all devices in a room."""
+
+    @pytest.mark.asyncio
+    async def test_next_picture_all_room_devices(
+        self,
+        room_devices_test_setup,
+        mqtt_test_client,
+    ):
+        """Test MEDIA_NEXT sends DisplayCommand to every online device in the room.
+
+        Flow:
+        1. Two devices are online in the same room
+        2. Publish IntentRequest with MEDIA_NEXT and room set
+        3. Assert DisplayCommand is published to both device command topics
+        """
+        device_names = room_devices_test_setup["device_names"]
+        room_name = room_devices_test_setup["room_name"]
+
+        # Subscribe to command topics for both devices
+        for name in device_names:
+            await mqtt_test_client.subscribe(f"inky/{name}/command")
+
+        # Build and publish intent request with room
+        classified_intent = ClassifiedIntent(
+            id=uuid.uuid4(),
+            intent_type=IntentType.MEDIA_NEXT,
+            confidence=0.9,
+            entities={},
+            alternative_intents=[],
+            raw_text="next picture",
+            timestamp=datetime.now(),
+        )
+
+        output_topic = f"assistant/test/output/{uuid.uuid4().hex[:8]}"
+        client_request = ClientRequest(
+            id=uuid.uuid4(),
+            text="next picture",
+            room=room_name,
+            output_topic=output_topic,
+        )
+
+        intent_request = IntentRequest(
+            id=uuid.uuid4(),
+            classified_intent=classified_intent,
+            client_request=client_request,
+        )
+
+        intent_json = intent_request.model_dump_json()
+        await mqtt_test_client.publish("assistant/intent_engine/result", intent_json, qos=1)
+
+        # Collect DisplayCommands for each device
+        received_devices: set[str] = set()
+        expected_devices = set(device_names)
+        timeout_seconds = 10
+
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                async for message in mqtt_test_client.messages:
+                    topic = str(message.topic)
+                    payload = message.payload.decode()
+
+                    # Check if this is a device command topic
+                    for name in device_names:
+                        if topic == f"inky/{name}/command":
+                            command_data = json.loads(payload)
+                            assert command_data.get("action") == "display"
+                            assert command_data.get("image_id") is not None
+                            received_devices.add(name)
+                            logger.debug("DisplayCommand received for %s: %s", name, payload)
+
+                    # Stop once all devices received commands
+                    if received_devices == expected_devices:
+                        break
+
+        except TimeoutError:
+            pass
+
+        assert received_devices == expected_devices, (
+            f"Expected commands for {expected_devices}, but only got {received_devices}"
+        )
+
+
+@pytest.fixture
+async def portrait_test_setup(db_engine, skill_config_file, mqtt_config):
+    """Set up a portrait device alongside a landscape device to test orientation-aware selection.
+
+    Creates two devices (portrait + landscape) with matching images for each,
+    then starts the skill. The portrait device should only receive portrait images
+    and the landscape device should only receive landscape images.
+    """
+    async with AsyncSession(db_engine) as session:
+        # Create landscape image (1600x1200)
+        landscape_image = Image(
+            id=uuid.uuid4(),
+            source_name="manual",
+            storage_path="manual/landscape-orient.jpg",
+            title="Landscape Image",
+            description="A landscape-oriented image",
+            original_width=1600,
+            original_height=1200,
+            display_duration_seconds=60,
+            created_at=datetime.now() - timedelta(days=2),
+            last_displayed_at=None,
+        )
+        session.add(landscape_image)
+
+        # Create portrait image (1200x1600 = swapped dimensions)
+        portrait_image = Image(
+            id=uuid.uuid4(),
+            source_name="manual",
+            storage_path="manual/portrait-orient.jpg",
+            title="Portrait Image",
+            description="A portrait-oriented image",
+            original_width=1200,
+            original_height=1600,
+            display_duration_seconds=60,
+            created_at=datetime.now() - timedelta(days=1),
+            last_displayed_at=None,
+        )
+        session.add(portrait_image)
+
+        # Create DeviceType and Skill
+        device_type = DeviceType(name="picture_display")
+        session.add(device_type)
+
+        skill_record = Skill(name="picture-display-skill-integration-test")
+        session.add(skill_record)
+
+        # Create room
+        room = Room(name="orient-room")
+        session.add(room)
+
+        await session.commit()
+        await session.refresh(device_type)
+        await session.refresh(skill_record)
+        await session.refresh(room)
+        await session.refresh(landscape_image)
+        await session.refresh(portrait_image)
+
+        device_type_id = device_type.id
+        skill_record_id = skill_record.id
+        room_id = room.id
+        landscape_image_id = str(landscape_image.id)
+        portrait_image_id = str(portrait_image.id)
+
+        # Landscape device (same panel 1600x1200, orientation=landscape)
+        landscape_device_id = uuid.uuid4()
+        session.add(
+            GlobalDevice(
+                id=landscape_device_id,
+                device_type_id=device_type_id,
+                skill_id=skill_record_id,
+                room_id=room_id,
+                name="inky-landscape",
+                pattern=["inky-landscape"],
+                device_attributes={
+                    "display_width": 1600,
+                    "display_height": 1200,
+                    "orientation": "landscape",
+                    "model": "impression-13.3-spectra6",
+                },
+            )
+        )
+        session.add(DeviceDisplayState(global_device_id=landscape_device_id, is_online=True))
+
+        # Portrait device (same panel 1600x1200 but orientation=portrait)
+        portrait_device_id = uuid.uuid4()
+        session.add(
+            GlobalDevice(
+                id=portrait_device_id,
+                device_type_id=device_type_id,
+                skill_id=skill_record_id,
+                room_id=room_id,
+                name="inky-portrait",
+                pattern=["inky-portrait"],
+                device_attributes={
+                    "display_width": 1600,
+                    "display_height": 1200,
+                    "orientation": "portrait",
+                    "model": "impression-13.3-spectra6",
+                },
+            )
+        )
+        session.add(DeviceDisplayState(global_device_id=portrait_device_id, is_online=True))
+
+        await session.commit()
+
+    await asyncio.sleep(0.5)
+
+    os.environ["MQTT_HOST"] = mqtt_config["host"]
+    os.environ["MQTT_PORT"] = str(mqtt_config["port"])
+    os.environ["DEVICE_MQTT_HOST"] = mqtt_config["host"]
+    os.environ["DEVICE_MQTT_PORT"] = str(mqtt_config["port"])
+    os.environ["DEVICE_MQTT_USERNAME"] = ""
+    os.environ["DEVICE_MQTT_PASSWORD"] = ""
+    os.environ["S3_ENDPOINT"] = "localhost:9000"
+    os.environ["S3_BUCKET"] = "inky-images"
+    os.environ["S3_READER_ACCESS_KEY"] = ""
+    os.environ["S3_READER_SECRET_KEY"] = ""
+
+    skill_task = asyncio.create_task(start_skill(skill_config_file))
+    await asyncio.sleep(3)
+
+    yield {
+        "landscape_image_id": landscape_image_id,
+        "portrait_image_id": portrait_image_id,
+    }
+
+    skill_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await skill_task
+
+
+class TestPortraitOrientation:
+    """Test that portrait and landscape devices receive correctly oriented images."""
+
+    @pytest.mark.asyncio
+    async def test_portrait_device_gets_portrait_image(
+        self,
+        portrait_test_setup,
+        mqtt_test_client,
+    ):
+        """Test MEDIA_NEXT gives each device an image matching its orientation.
+
+        Flow:
+        1. Room has a landscape device and a portrait device
+        2. DB has one landscape image (1600x1200) and one portrait image (1200x1600)
+        3. Publish MEDIA_NEXT for the room
+        4. Assert landscape device gets the landscape image
+        5. Assert portrait device gets the portrait image
+        """
+        landscape_image_id = portrait_test_setup["landscape_image_id"]
+        portrait_image_id = portrait_test_setup["portrait_image_id"]
+
+        await mqtt_test_client.subscribe("inky/inky-landscape/command")
+        await mqtt_test_client.subscribe("inky/inky-portrait/command")
+
+        classified_intent = ClassifiedIntent(
+            id=uuid.uuid4(),
+            intent_type=IntentType.MEDIA_NEXT,
+            confidence=0.9,
+            entities={},
+            alternative_intents=[],
+            raw_text="next picture",
+            timestamp=datetime.now(),
+        )
+
+        output_topic = f"assistant/test/output/{uuid.uuid4().hex[:8]}"
+        client_request = ClientRequest(
+            id=uuid.uuid4(),
+            text="next picture",
+            room="orient-room",
+            output_topic=output_topic,
+        )
+
+        intent_request = IntentRequest(
+            id=uuid.uuid4(),
+            classified_intent=classified_intent,
+            client_request=client_request,
+        )
+
+        await mqtt_test_client.publish("assistant/intent_engine/result", intent_request.model_dump_json(), qos=1)
+
+        received: dict[str, str] = {}
+        timeout_seconds = 10
+
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                async for message in mqtt_test_client.messages:
+                    topic = str(message.topic)
+                    payload = message.payload.decode()
+
+                    if topic == "inky/inky-landscape/command":
+                        command_data = json.loads(payload)
+                        assert command_data.get("action") == "display"
+                        received["landscape"] = command_data["image_id"]
+                    elif topic == "inky/inky-portrait/command":
+                        command_data = json.loads(payload)
+                        assert command_data.get("action") == "display"
+                        received["portrait"] = command_data["image_id"]
+
+                    if "landscape" in received and "portrait" in received:
+                        break
+
+        except TimeoutError:
+            pass
+
+        assert "landscape" in received, "Landscape device did not receive a command"
+        assert "portrait" in received, "Portrait device did not receive a command"
+
+        assert received["landscape"] == landscape_image_id, (
+            f"Landscape device got image {received['landscape']}, expected {landscape_image_id}"
+        )
+        assert received["portrait"] == portrait_image_id, (
+            f"Portrait device got image {received['portrait']}, expected {portrait_image_id}"
+        )
