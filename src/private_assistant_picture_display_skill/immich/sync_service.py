@@ -399,6 +399,10 @@ class ImmichSyncService:
                 f"Got: width={width}, height={height}, orientation={orientation}"
             )
 
+        # Portrait devices have the panel physically rotated, so swap dimensions
+        if orientation == "portrait":
+            width, height = height, width
+
         return DeviceRequirements(
             width=width,
             height=height,

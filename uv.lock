@@ -577,7 +577,7 @@ wheels = [
 
 [[package]]
 name = "private-assistant-picture-display-skill"
-version = "0.9.0"
+version = "0.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "coloraide" },

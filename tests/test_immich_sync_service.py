@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 from minio.error import S3Error
+from private_assistant_commons.database import GlobalDevice
 from pydantic import ValidationError
 
 from private_assistant_picture_display_skill.immich.config import ImmichSyncConfig, S3WriterConfig
@@ -441,3 +442,69 @@ async def test_cleanup_called_before_capacity_check() -> None:
 
     assert call_order[0] == "cleanup"
     assert "count" in call_order
+
+
+class TestGetDeviceRequirementsPortrait:
+    """Test that _get_device_requirements swaps dimensions for portrait devices."""
+
+    @pytest.mark.asyncio
+    async def test_landscape_preserves_dimensions(self) -> None:
+        """Landscape device keeps width=1600, height=1200."""
+        device_id = uuid4()
+        device = MagicMock(spec=GlobalDevice)
+        device.device_attributes = {
+            "display_width": 1600,
+            "display_height": 1200,
+            "orientation": "landscape",
+            "model": "test-model",
+        }
+
+        mock_result = MagicMock()
+        mock_result.first.return_value = device
+        mock_session = AsyncMock()
+        mock_session.exec = AsyncMock(return_value=mock_result)
+
+        engine = MagicMock()
+        service = ImmichSyncService.__new__(ImmichSyncService)
+        service.engine = engine
+        service.logger = MagicMock()
+
+        with patch("private_assistant_picture_display_skill.immich.sync_service.AsyncSession") as mock_session_cls:
+            mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+            reqs = await service._get_device_requirements(device_id)
+
+        assert reqs.width == 1600
+        assert reqs.height == 1200
+        assert reqs.orientation == "landscape"
+
+    @pytest.mark.asyncio
+    async def test_portrait_swaps_dimensions(self) -> None:
+        """Portrait device swaps to width=1200, height=1600."""
+        device_id = uuid4()
+        device = MagicMock(spec=GlobalDevice)
+        device.device_attributes = {
+            "display_width": 1600,
+            "display_height": 1200,
+            "orientation": "portrait",
+            "model": "test-model",
+        }
+
+        mock_result = MagicMock()
+        mock_result.first.return_value = device
+        mock_session = AsyncMock()
+        mock_session.exec = AsyncMock(return_value=mock_result)
+
+        engine = MagicMock()
+        service = ImmichSyncService.__new__(ImmichSyncService)
+        service.engine = engine
+        service.logger = MagicMock()
+
+        with patch("private_assistant_picture_display_skill.immich.sync_service.AsyncSession") as mock_session_cls:
+            mock_session_cls.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+            reqs = await service._get_device_requirements(device_id)
+
+        assert reqs.width == 1200
+        assert reqs.height == 1600
+        assert reqs.orientation == "portrait"
