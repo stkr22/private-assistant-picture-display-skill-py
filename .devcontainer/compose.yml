@@ -7,7 +7,7 @@ services:
     container_name: picture-display-skill-dev
     userns_mode: "keep-id"  # Podman: keeps your host UID
     volumes:
-      - ..:/workspace:cached,U
+      - ..:/workspaces/private-assistant-picture-display-skill:cached,U
     command: sleep infinity
     cap_add:
       - NET_RAW
