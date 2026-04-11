@@ -55,6 +55,10 @@ class ImmichAsset(BaseModel):
     file_created_at: datetime = Field(alias="fileCreatedAt")
     local_date_time: datetime | None = Field(default=None, alias="localDateTime")
 
+    # Dimensions (top-level fields from API, available on all endpoints)
+    width: int | None = None
+    height: int | None = None
+
     # Optional metadata
     exif_info: ImmichExifInfo | None = Field(default=None, alias="exifInfo")
     people: list[ImmichPerson] | None = None

@@ -7,10 +7,12 @@ from minio.error import S3Error
 from private_assistant_commons.database import GlobalDevice
 from pydantic import ValidationError
 
-from private_assistant_picture_display_skill.immich.config import ImmichSyncConfig, S3WriterConfig
+from private_assistant_picture_display_skill.immich.config import DeviceRequirements, ImmichSyncConfig, S3WriterConfig
+from private_assistant_picture_display_skill.immich.models import ImmichAsset, ImmichExifInfo
 from private_assistant_picture_display_skill.immich.storage import S3StorageClient
 from private_assistant_picture_display_skill.immich.sync_service import CleanupResult, ImmichSyncService
 from private_assistant_picture_display_skill.models.image import Image
+from private_assistant_picture_display_skill.models.immich_sync_job import ImmichSyncJob
 
 
 class TestCleanupResult:
@@ -508,3 +510,126 @@ class TestGetDeviceRequirementsPortrait:
         assert reqs.width == 1200
         assert reqs.height == 1600
         assert reqs.orientation == "portrait"
+
+
+class TestFilterAssets:
+    """Test _filter_assets uses top-level dimensions with EXIF fallback."""
+
+    def _make_service(self) -> ImmichSyncService:
+        with patch("private_assistant_picture_display_skill.immich.sync_service.ImmichClient"):
+            service = ImmichSyncService(
+                engine=MagicMock(),
+                logger=MagicMock(),
+                connection_config=MagicMock(),
+                sync_config=ImmichSyncConfig(_env_file=None),
+                s3_config=S3WriterConfig(
+                    endpoint="localhost:9000",
+                    bucket="test",
+                    secure=False,
+                    access_key="k",
+                    secret_key="s",
+                ),
+            )
+        service.storage = MagicMock()
+        return service
+
+    def _make_asset(
+        self,
+        asset_id: str = "a1",
+        width: int | None = None,
+        height: int | None = None,
+        exif_width: int | None = None,
+        exif_height: int | None = None,
+    ) -> ImmichAsset:
+        exif = None
+        if exif_width is not None or exif_height is not None:
+            exif = ImmichExifInfo(exif_image_width=exif_width, exif_image_height=exif_height)
+        return ImmichAsset(
+            id=asset_id,
+            type="IMAGE",
+            original_file_name="test.jpg",
+            original_mime_type="image/jpeg",
+            checksum="abc",
+            file_created_at=datetime.now(),
+            width=width,
+            height=height,
+            exif_info=exif,
+        )
+
+    def _make_job(self, count: int = 10) -> ImmichSyncJob:
+        return ImmichSyncJob(
+            name="test-job",
+            target_device_id=uuid4(),
+            count=count,
+        )
+
+    def _landscape_reqs(self) -> DeviceRequirements:
+        return DeviceRequirements(width=1920, height=1080, orientation="landscape")
+
+    def _portrait_reqs(self) -> DeviceRequirements:
+        return DeviceRequirements(width=1080, height=1920, orientation="portrait")
+
+    def test_top_level_landscape_dimensions_used(self) -> None:
+        """Assets with top-level width/height are filtered correctly."""
+        service = self._make_service()
+        assets = [
+            self._make_asset("landscape", width=4000, height=3000),
+            self._make_asset("portrait", width=3000, height=4000),
+        ]
+        result = service._filter_assets(assets, self._make_job(), self._landscape_reqs())
+        assert len(result) == 1
+        assert result[0].id == "landscape"
+
+    def test_top_level_portrait_dimensions_used(self) -> None:
+        """Portrait filter selects only portrait assets."""
+        service = self._make_service()
+        assets = [
+            self._make_asset("landscape", width=4000, height=3000),
+            self._make_asset("portrait", width=3000, height=4000),
+        ]
+        result = service._filter_assets(assets, self._make_job(), self._portrait_reqs())
+        assert len(result) == 1
+        assert result[0].id == "portrait"
+
+    def test_exif_fallback_when_no_top_level_dims(self) -> None:
+        """Falls back to EXIF dimensions when top-level fields are absent."""
+        service = self._make_service()
+        assets = [
+            self._make_asset("exif-landscape", exif_width=4000, exif_height=3000),
+        ]
+        result = service._filter_assets(assets, self._make_job(), self._landscape_reqs())
+        assert len(result) == 1
+        assert result[0].id == "exif-landscape"
+
+    def test_skips_asset_without_any_dimensions(self) -> None:
+        """Assets with no dimensions at all are skipped."""
+        service = self._make_service()
+        assets = [self._make_asset("no-dims")]
+        result = service._filter_assets(assets, self._make_job(), self._landscape_reqs())
+        assert len(result) == 0
+
+    def test_skips_undersized_assets(self) -> None:
+        """Assets smaller than device requirements are skipped."""
+        service = self._make_service()
+        assets = [
+            self._make_asset("too-small", width=800, height=600),
+        ]
+        result = service._filter_assets(assets, self._make_job(), self._landscape_reqs())
+        assert len(result) == 0
+
+    def test_limits_to_job_count(self) -> None:
+        """Result is limited to job.count."""
+        service = self._make_service()
+        assets = [self._make_asset(f"a{i}", width=4000, height=3000) for i in range(20)]
+        result = service._filter_assets(assets, self._make_job(count=5), self._landscape_reqs())
+        assert len(result) == 5
+
+    def test_top_level_preferred_over_exif(self) -> None:
+        """Top-level dimensions are used even when EXIF is also available."""
+        service = self._make_service()
+        # Top-level says landscape, EXIF says portrait
+        assets = [
+            self._make_asset("mixed", width=4000, height=3000, exif_width=3000, exif_height=4000),
+        ]
+        result = service._filter_assets(assets, self._make_job(), self._landscape_reqs())
+        assert len(result) == 1  # Uses top-level (landscape) -> passes landscape filter
