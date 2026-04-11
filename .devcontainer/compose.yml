@@ -6,8 +6,9 @@ services:
     image: ghcr.io/stkr22/devcontainer-python-container:1.5.0@sha256:94c35390676241f49f65561340fc23b59d7db15cdd878ad73a8f459ebae23b2c
     container_name: picture-display-skill-dev
     userns_mode: "keep-id"  # Podman: keeps your host UID
+    "workspaceFolder": "/workspaces/private-assistant-picture-display-skill"
     volumes:
-      - ..:/workspace:cached,U
+      - ..:/workspaces/private-assistant-picture-display-skill:cached,U
     command: sleep infinity
     cap_add:
       - NET_RAW

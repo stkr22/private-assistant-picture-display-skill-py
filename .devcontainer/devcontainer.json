@@ -2,8 +2,8 @@
 	"name": "private-assistant-picture-display-skill-dev-environment",
 	"dockerComposeFile": "compose.yml",
 	"service": "dev",
-	"workspaceFolder": "/workspace/private-assistant-picture-display-skill-py",
 	"remoteUser": "vscode",
+	"workspaceFolder": "/workspaces/private-assistant-picture-display-skill",
     "features": {
         "ghcr.io/stkr22/devcontainer-features/claude-code:2.0.3": {},
         "ghcr.io/stkr22/devcontainer-features/uv:1.0.0": {},

@@ -377,19 +377,19 @@ class PictureSkill(BaseSkill):
             case _:
                 self.logger.warning("Unhandled intent type: %s", intent_type)
 
-    async def _select_device_for_request(self, intent_request: IntentRequest) -> GlobalDevice | None:
-        """Select appropriate device based on room or explicit naming.
+    async def _select_devices_for_request(self, intent_request: IntentRequest) -> list[GlobalDevice]:
+        """Select all appropriate devices based on room or explicit naming.
 
         Priority:
-        1. Explicitly named device in entities
-        2. Device in same room as request
+        1. Explicitly named device in entities (single device)
+        2. All online devices in the same room as request
         3. First online device (fallback)
 
         Args:
             intent_request: Intent request with client info and entities
 
         Returns:
-            Selected GlobalDevice or None if no suitable device found
+            List of matching online GlobalDevices, may be empty
 
         """
         device: GlobalDevice  # Type annotation for loop variable
@@ -404,23 +404,31 @@ class PictureSkill(BaseSkill):
                     device.id
                 ):
                     self.logger.debug("Selected device by name: %s", device.name)
-                    return device
+                    return [device]
 
-        # Room-based selection using global device registry
+        # Room-based selection: collect all online devices in the room
         request_room = intent_request.client_request.room
         if request_room:
+            room_devices: list[GlobalDevice] = []
             for device in self.global_devices:
                 if device.room and device.room.name == request_room and await self._is_device_online(device.id):
-                    self.logger.debug("Selected device by room: %s (room: %s)", device.name, request_room)
-                    return device
+                    room_devices.append(device)
+            if room_devices:
+                self.logger.debug(
+                    "Selected %d device(s) in room %s: %s",
+                    len(room_devices),
+                    request_room,
+                    [d.name for d in room_devices],
+                )
+                return room_devices
 
         # Fallback: first online device
         for device in self.global_devices:
             if await self._is_device_online(device.id):
                 self.logger.debug("Selected first online device: %s", device.name)
-                return device
+                return [device]
 
-        return None
+        return []
 
     async def _is_device_online(self, global_device_id: UUID) -> bool:
         """Check if a device is online.
@@ -442,6 +450,8 @@ class PictureSkill(BaseSkill):
     async def _handle_media_next(self, intent_request: IntentRequest) -> None:
         """Handle 'next picture' command.
 
+        Refreshes all matching devices (e.g. all devices in a room).
+
         Args:
             intent_request: Intent request with client info
 
@@ -453,30 +463,33 @@ class PictureSkill(BaseSkill):
             )
             return
 
-        # Select device using room-based or explicit naming
-        device = await self._select_device_for_request(intent_request)
-        if device is None:
+        devices = await self._select_devices_for_request(intent_request)
+        if not devices:
             await self.send_response(
                 "No picture displays are currently online.",
                 intent_request.client_request,
             )
             return
 
-        # Get next image
-        image = await self.image_manager.get_next_image_for_device(device)
-        if image is None:
+        last_image = None
+        for device in devices:
+            image = await self.image_manager.get_next_image_for_device(device)
+            if image is None:
+                self.logger.warning("No images available for device %s", device.name)
+                continue
+            await self.image_manager.send_display_command(device, image)
+            last_image = image
+
+        if last_image is None:
             await self.send_response(
                 "No images available to display.",
                 intent_request.client_request,
             )
             return
 
-        # Send display command
-        await self.image_manager.send_display_command(device, image)
-
-        # Send voice response
+        # Send voice response based on the last displayed image
         template = self.template_env.get_template("next_picture.j2")
-        response_text = template.render(image=image)
+        response_text = template.render(image=last_image)
         await self.send_response(response_text, intent_request.client_request)
 
     async def _handle_query_status(self, intent_request: IntentRequest) -> None:
@@ -494,13 +507,14 @@ class PictureSkill(BaseSkill):
             return
 
         # Select device using room-based or explicit naming
-        device = await self._select_device_for_request(intent_request)
-        if device is None:
+        devices = await self._select_devices_for_request(intent_request)
+        if not devices:
             await self.send_response(
                 "No picture displays are currently online.",
                 intent_request.client_request,
             )
             return
+        device = devices[0]
 
         # Get current image
         image = await self.image_manager.get_current_image_for_device(device.id)
