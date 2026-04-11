@@ -31,8 +31,8 @@ class TestCalculateVibrancyScore:
         score = ColorProfileAnalyzer.calculate_vibrancy_score(_image_to_bytes(img))
         assert score > 0.5, f"Vibrant color image should score > 0.5, got {score}"
 
-    def test_high_contrast_bw_image_scores_high(self) -> None:
-        """B&W image with strong contrast should score high via contrast."""
+    def test_high_contrast_bw_image_gets_contrast_bonus(self) -> None:
+        """B&W image scores via contrast bonus, but lower than saturated images."""
         img = Image.new("RGB", (200, 200))
         # Left half black, right half white
         for x in range(200):
@@ -43,7 +43,8 @@ class TestCalculateVibrancyScore:
                     img.putpixel((x, y), (255, 255, 255))
 
         score = ColorProfileAnalyzer.calculate_vibrancy_score(_image_to_bytes(img))
-        assert score > 0.5, f"High-contrast B&W image should score > 0.5, got {score}"
+        # Contrast bonus only (~0.3 * 1.0) — no saturation contribution
+        assert 0.2 < score < 0.5, f"B&W image should score 0.2-0.5 via contrast bonus, got {score}"
 
     def test_uniform_mid_gray_scores_low(self) -> None:
         """Uniform mid-gray image: no saturation, no contrast -> low score."""
