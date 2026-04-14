@@ -146,9 +146,9 @@ class DeviceMqttClient:
         """
         try:
             if isinstance(payload, bytes | bytearray):
-                return json.loads(payload.decode("utf-8"))  # type: ignore[no-any-return]
+                return json.loads(payload.decode("utf-8"))
             if isinstance(payload, str):
-                return json.loads(payload)  # type: ignore[no-any-return]
+                return json.loads(payload)
             return None
         except json.JSONDecodeError:
             return None

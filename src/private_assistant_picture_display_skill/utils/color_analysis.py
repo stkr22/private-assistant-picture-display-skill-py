@@ -3,7 +3,7 @@
 from io import BytesIO
 from typing import ClassVar
 
-from coloraide import Color  # type: ignore[import-untyped]
+from coloraide import Color
 from PIL import Image
 
 
@@ -69,7 +69,7 @@ class ColorProfileAnalyzer:
 
         for count, color_idx in colors_with_counts:
             # color_idx is palette index (int) for quantized P-mode images
-            idx = int(color_idx)  # type: ignore[arg-type]
+            idx = int(color_idx)  # ty: ignore[invalid-argument-type]
             r, g, b = palette[idx * 3 : idx * 3 + 3]
             img_color = Color("srgb", [r / 255, g / 255, b / 255])
 

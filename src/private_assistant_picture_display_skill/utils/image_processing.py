@@ -2,7 +2,7 @@
 
 from io import BytesIO
 
-import pillow_heif  # type: ignore[import-untyped]
+import pillow_heif
 from PIL import Image
 from PIL.Image import Resampling
 

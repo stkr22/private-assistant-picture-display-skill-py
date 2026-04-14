@@ -119,9 +119,10 @@ class ImmichSyncService:
         self.logger = logger
 
         # Load configs from environment if not provided
-        self.connection_config = connection_config or ImmichConnectionConfig()
+        # pydantic-settings fills required fields from environment variables
+        self.connection_config = connection_config or ImmichConnectionConfig()  # ty: ignore[missing-argument]
         self.sync_config = sync_config or ImmichSyncConfig()
-        self.s3_config = s3_config or S3WriterConfig()
+        self.s3_config = s3_config or S3WriterConfig()  # ty: ignore[missing-argument]
 
         # Initialize clients
         self.immich = ImmichClient(
@@ -221,9 +222,9 @@ class ImmichSyncService:
         async with AsyncSession(self.engine) as session:
             # Find expired Immich images
             expired_stmt = select(Image).where(
-                Image.source_url.like("immich://%"),  # type: ignore[union-attr]
-                Image.expires_at.isnot(None),  # type: ignore[union-attr]
-                Image.expires_at < now,  # type: ignore[operator]
+                Image.source_url.like("immich://%"),  # ty: ignore[unresolved-attribute]
+                Image.expires_at.isnot(None),  # ty: ignore[unresolved-attribute]
+                Image.expires_at < now,  # ty: ignore[unsupported-operator]
             )
             expired_result = await session.exec(expired_stmt)
             expired_images = list(expired_result.all())
@@ -235,7 +236,7 @@ class ImmichSyncService:
 
             # Get currently displayed image IDs to protect
             displayed_stmt = select(DeviceDisplayState.current_image_id).where(
-                DeviceDisplayState.current_image_id.isnot(None)  # type: ignore[union-attr]
+                DeviceDisplayState.current_image_id.isnot(None)  # ty: ignore[unresolved-attribute]
             )
             displayed_result = await session.exec(displayed_stmt)
             protected_ids: set[UUID] = {row for row in displayed_result.all() if row is not None}
@@ -513,7 +514,7 @@ class ImmichSyncService:
         """
         async with AsyncSession(self.engine) as session:
             result = await session.exec(
-                select(sqlalchemy.func.count()).select_from(Image).where(Image.source_url.like("immich://%"))  # type: ignore[union-attr]
+                select(sqlalchemy.func.count()).select_from(Image).where(Image.source_url.like("immich://%"))  # ty: ignore[unresolved-attribute]
             )
             return result.one()
 

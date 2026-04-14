@@ -87,8 +87,8 @@ class PictureSkill(BaseSkill):
 
         # Load device MQTT and S3 configs from environment
         # AIDEV-NOTE: These use pydantic-settings with env prefixes (DEVICE_MQTT_*, S3_*)
-        self.device_mqtt_config = DeviceMqttConfig()
-        self.s3_config = S3Config()
+        self.device_mqtt_config = DeviceMqttConfig()  # ty: ignore[missing-argument]
+        self.s3_config = S3Config()  # ty: ignore[missing-argument]
 
         # Configure supported intents with confidence thresholds
         self.supported_intents = {
@@ -254,7 +254,7 @@ class PictureSkill(BaseSkill):
 
         # Send registration response with MinIO credentials
         response = RegistrationResponse(
-            status=status,  # type: ignore[arg-type]
+            status=status,
             s3_endpoint=self.s3_config.endpoint,
             s3_bucket=self.s3_config.bucket,
             s3_access_key=self.s3_config.reader_access_key,
