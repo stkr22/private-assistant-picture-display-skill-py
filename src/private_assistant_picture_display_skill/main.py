@@ -58,8 +58,7 @@ async def start_skill(config_path: pathlib.Path) -> None:
     # Create only skill-specific tables, not all SQLModel metadata
     # AIDEV-NOTE: Global device registry tables are managed by BaseSkill and commons
     async with db_engine_async.begin() as conn:
-        # __table__ is a SQLAlchemy runtime attribute that mypy doesn't recognize
-        for table in [Image.__table__, DeviceDisplayState.__table__]:  # type: ignore[attr-defined]
+        for table in [Image.__table__, DeviceDisplayState.__table__]:  # ty: ignore[unresolved-attribute]
             await conn.run_sync(table.create, checkfirst=True)
 
     logger.info("Database tables initialized for Picture Display Skill")
@@ -72,7 +71,7 @@ async def start_skill(config_path: pathlib.Path) -> None:
 
     # Start the skill using the async MQTT connection handler
     # AIDEV-NOTE: mqtt_connection_handler manages MQTT lifecycle with auto-reconnect
-    mqtt_config = MqttConfig()
+    mqtt_config = MqttConfig()  # ty: ignore[missing-argument]
     await mqtt_connection_handler.mqtt_connection_handler(
         PictureSkill,
         config_obj,
@@ -116,7 +115,7 @@ async def run_immich_sync(dry_run: bool) -> None:
 
     # Ensure required tables exist
     async with db_engine.begin() as conn:
-        for table in [Image.__table__, ImmichSyncJob.__table__]:  # type: ignore[attr-defined]
+        for table in [Image.__table__, ImmichSyncJob.__table__]:  # ty: ignore[unresolved-attribute]
             await conn.run_sync(table.create, checkfirst=True)
 
     if dry_run:

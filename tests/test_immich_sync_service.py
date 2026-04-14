@@ -81,13 +81,13 @@ class TestS3StorageClientDelete:
 class TestRetentionDaysConfig:
     def test_default_retention_days(self) -> None:
         config = ImmichSyncConfig(
-            _env_file=None,
+            _env_file=None,  # ty: ignore[unknown-argument]
         )
         assert config.retention_days == 7
 
     def test_retention_days_zero_disables_cleanup(self) -> None:
         config = ImmichSyncConfig(
-            _env_file=None,
+            _env_file=None,  # ty: ignore[unknown-argument]
             retention_days=0,
         )
         assert config.retention_days == 0
@@ -95,13 +95,13 @@ class TestRetentionDaysConfig:
     def test_retention_days_negative_rejected(self) -> None:
         with pytest.raises(ValidationError):
             ImmichSyncConfig(
-                _env_file=None,
+                _env_file=None,  # ty: ignore[unknown-argument]
                 retention_days=-1,
             )
 
     def test_retention_days_custom_value(self) -> None:
         config = ImmichSyncConfig(
-            _env_file=None,
+            _env_file=None,  # ty: ignore[unknown-argument]
             retention_days=30,
         )
         assert config.retention_days == 30
@@ -112,7 +112,7 @@ class TestCleanupExpiredImages:
         engine = MagicMock()
         logger = MagicMock()
         sync_config = ImmichSyncConfig(
-            _env_file=None,
+            _env_file=None,  # ty: ignore[unknown-argument]
             retention_days=retention_days,
         )
         s3_config = S3WriterConfig(
@@ -189,7 +189,7 @@ class TestCleanupExpiredImages:
         assert result.deleted == 1
         assert result.protected == 0
         mock_session.delete.assert_called_once_with(expired_image)
-        service.storage.delete_object.assert_called_once_with(expired_image.storage_path)  # type: ignore[attr-defined]
+        service.storage.delete_object.assert_called_once_with(expired_image.storage_path)  # ty: ignore[unresolved-attribute]
         mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
@@ -215,13 +215,13 @@ class TestCleanupExpiredImages:
         assert result.deleted == 0
         assert result.protected == 1
         mock_session.delete.assert_not_called()
-        service.storage.delete_object.assert_not_called()  # type: ignore[attr-defined]
+        service.storage.delete_object.assert_not_called()  # ty: ignore[unresolved-attribute]
 
     @pytest.mark.asyncio
     async def test_minio_failure_counts_storage_error(self) -> None:
         service = self._make_service()
         expired_image = self._make_image(expires_at=datetime.now() - timedelta(days=1))
-        service.storage.delete_object.side_effect = Exception("MinIO connection failed")  # type: ignore[attr-defined]
+        service.storage.delete_object.side_effect = Exception("MinIO connection failed")  # ty: ignore[unresolved-attribute]
 
         mock_session = AsyncMock()
         mock_expired_result = MagicMock()
@@ -295,7 +295,7 @@ class TestExpiresAtPopulation:
 
     def test_expires_at_set_when_retention_days_positive(self) -> None:
         image = self._make_image()
-        sync_config = ImmichSyncConfig(_env_file=None, retention_days=7)
+        sync_config = ImmichSyncConfig(_env_file=None, retention_days=7)  # ty: ignore[unknown-argument]
 
         if sync_config.retention_days > 0:
             image.expires_at = image.created_at + timedelta(days=sync_config.retention_days)
@@ -306,7 +306,7 @@ class TestExpiresAtPopulation:
 
     def test_expires_at_none_when_retention_days_zero(self) -> None:
         image = self._make_image()
-        sync_config = ImmichSyncConfig(_env_file=None, retention_days=0)
+        sync_config = ImmichSyncConfig(_env_file=None, retention_days=0)  # ty: ignore[unknown-argument]
 
         if sync_config.retention_days > 0:
             image.expires_at = image.created_at + timedelta(days=sync_config.retention_days)
@@ -321,7 +321,7 @@ class TestCleanupInSyncFlow:
         engine = MagicMock()
         logger = MagicMock()
         sync_config = ImmichSyncConfig(
-            _env_file=None,
+            _env_file=None,  # ty: ignore[unknown-argument]
             retention_days=retention_days,
             max_images=20,
         )
@@ -398,7 +398,7 @@ async def test_cleanup_called_before_capacity_check() -> None:
     engine = MagicMock()
     logger = MagicMock()
     sync_config = ImmichSyncConfig(
-        _env_file=None,
+        _env_file=None,  # ty: ignore[unknown-argument]
         retention_days=7,
         max_images=5,
     )
@@ -527,7 +527,7 @@ class TestFilterAssets:
                 engine=MagicMock(),
                 logger=MagicMock(),
                 connection_config=MagicMock(),
-                sync_config=ImmichSyncConfig(_env_file=None),
+                sync_config=ImmichSyncConfig(_env_file=None),  # ty: ignore[unknown-argument]
                 s3_config=S3WriterConfig(
                     endpoint="localhost:9000",
                     bucket="test",
@@ -550,13 +550,13 @@ class TestFilterAssets:
         exif = None
         if exif_width is not None or exif_height is not None:
             exif = ImmichExifInfo(exif_image_width=exif_width, exif_image_height=exif_height)
-        return ImmichAsset(
+        return ImmichAsset(  # ty: ignore[missing-argument]
             id=asset_id,
             type="IMAGE",
-            original_file_name="test.jpg",
-            original_mime_type="image/jpeg",
+            original_file_name="test.jpg",  # ty: ignore[unknown-argument]
+            original_mime_type="image/jpeg",  # ty: ignore[unknown-argument]
             checksum="abc",
-            file_created_at=datetime.now(),
+            file_created_at=datetime.now(),  # ty: ignore[unknown-argument]
             width=width,
             height=height,
             exif_info=exif,
@@ -650,7 +650,7 @@ class TestVibrancyFiltering:
                 engine=MagicMock(),
                 logger=MagicMock(),
                 connection_config=MagicMock(),
-                sync_config=ImmichSyncConfig(_env_file=None),
+                sync_config=ImmichSyncConfig(_env_file=None),  # ty: ignore[unknown-argument]
                 s3_config=S3WriterConfig(
                     endpoint="localhost:9000",
                     bucket="test",
@@ -664,13 +664,13 @@ class TestVibrancyFiltering:
         return service
 
     def _make_asset(self) -> ImmichAsset:
-        return ImmichAsset(
+        return ImmichAsset(  # ty: ignore[missing-argument]
             id="test-asset",
             type="IMAGE",
-            original_file_name="test.jpg",
-            original_mime_type="image/jpeg",
+            original_file_name="test.jpg",  # ty: ignore[unknown-argument]
+            original_mime_type="image/jpeg",  # ty: ignore[unknown-argument]
             checksum="abc",
-            file_created_at=datetime.now(),
+            file_created_at=datetime.now(),  # ty: ignore[unknown-argument]
             width=4000,
             height=3000,
         )

@@ -21,7 +21,7 @@ uv run pytest
 ```
 Apply formatting and Check code quality and Validate types. Always run after the end of a task.
 ```bash
-uv run ruff check --fix . && uv run ruff format . && uv run mypy .
+uv run ruff check --fix . && uv run ruff format . && uv run ty check
 ```
 
 ## Code Documentation
