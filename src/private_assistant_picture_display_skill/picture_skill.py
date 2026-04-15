@@ -1,15 +1,14 @@
-"""Picture Display Skill for controlling Inky e-ink displays."""
+"""Picture Display Skill for controlling Inky e-ink displays via the display API."""
 
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 from typing import TYPE_CHECKING
 
+import httpx
 import jinja2
 from private_assistant_commons import BaseSkill, IntentRequest, IntentType
 from private_assistant_commons.database import GlobalDevice
-from pydantic import ValidationError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -20,15 +19,8 @@ if TYPE_CHECKING:
     import aiomqtt
     from sqlalchemy.ext.asyncio import AsyncEngine
 
-from private_assistant_picture_display_skill.config import DeviceMqttConfig, PictureSkillConfig, S3Config
-from private_assistant_picture_display_skill.models.commands import (
-    DeviceAcknowledge,
-    DeviceRegistration,
-    RegistrationResponse,
-)
-from private_assistant_picture_display_skill.models.device import DeviceDisplayState
-from private_assistant_picture_display_skill.services.device_mqtt_client import DeviceMqttClient
-from private_assistant_picture_display_skill.services.image_manager import ImageManager
+from private_assistant_picture_display_skill.api_client import DisplayApiClient, ImageInfo
+from private_assistant_picture_display_skill.config import ApiConfig, PictureSkillConfig
 
 
 class PictureSkill(BaseSkill):
@@ -38,20 +30,17 @@ class PictureSkill(BaseSkill):
     - "next picture" / "show next" - Display next image in queue
     - "what am I seeing?" / "describe this picture" - Describe current image
 
-    The skill connects to two MQTT brokers:
-    1. Internal MQTT (via BaseSkill): For intent engine communication
-    2. Device MQTT (authenticated): For Inky device communication
+    Delegates all device and image management to the display API over HTTP.
     """
 
-    # Help text for the skill (automatically stored in database)
     help_text = (
         "You can control the picture display with these commands. "
         'Say "next picture" to show the next image. '
         'Say "what am I seeing" to hear a description of the current picture.'
     )
 
-    # Class attribute for rotation check interval (seconds) - can be overridden in tests
-    rotation_check_interval: int = 30
+    # Device sync interval in seconds
+    device_sync_interval: int = 60
 
     def __init__(  # noqa: PLR0913
         self,
@@ -82,24 +71,22 @@ class PictureSkill(BaseSkill):
             logger=logger,
         )
 
-        # Store skill-specific config
         self.skill_config = config_obj
 
-        # Load device MQTT and S3 configs from environment
-        # AIDEV-NOTE: These use pydantic-settings with env prefixes (DEVICE_MQTT_*, S3_*)
-        self.device_mqtt_config = DeviceMqttConfig()  # ty: ignore[missing-argument]
-        self.s3_config = S3Config()  # ty: ignore[missing-argument]
+        # Display API client
+        self.api_config = ApiConfig()  # ty: ignore[missing-argument]
+        self.api_client = DisplayApiClient(
+            base_url=self.api_config.base_url,
+            timeout=self.api_config.timeout,
+        )
 
-        # Configure supported intents with confidence thresholds
         self.supported_intents = {
-            IntentType.MEDIA_NEXT: 0.8,  # "next picture", "show next", "skip"
-            IntentType.DEVICE_QUERY: 0.7,  # "what am I seeing?", "describe this"
+            IntentType.MEDIA_NEXT: 0.8,
+            IntentType.DEVICE_QUERY: 0.7,
         }
 
-        # Device type for global registry
         self.supported_device_types = ["picture_display"]
 
-        # Use provided template environment or create default
         if template_env is not None:
             self.template_env = template_env
         else:
@@ -108,161 +95,67 @@ class PictureSkill(BaseSkill):
                 autoescape=True,
             )
 
-        # Services - initialized in skill_preparations
-        self.device_mqtt: DeviceMqttClient | None = None
-        self.image_manager: ImageManager | None = None
-
     async def skill_preparations(self) -> None:
         """Initialize services after MQTT setup."""
         await super().skill_preparations()
 
-        # Initialize device MQTT client
-        self.device_mqtt = DeviceMqttClient(self.device_mqtt_config, self.logger)
+        # Sync devices from the display API into GlobalDevice registry
+        await self._sync_devices_from_api()
 
-        # Start device MQTT as background task
-        # AIDEV-NOTE: mqtt_connection_handler doesn't know about our second MQTT, so we manage it here
-        self.add_task(self.start_device_mqtt(), name="device_mqtt")
+        # Start periodic device sync
+        self.add_task(self._periodic_device_sync(), name="device_sync")
 
         self.logger.info("Picture skill preparations complete")
 
-    async def start_device_mqtt(self) -> None:
-        """Start the device MQTT connection and message listener.
-
-        Runs the device MQTT connection as a background task with
-        auto-reconnect behavior.
-        """
-        if self.device_mqtt is None:
-            raise RuntimeError("Device MQTT client not initialized")
-
-        async with self.device_mqtt.connect():
-            # Initialize services that depend on MQTT
-            self.image_manager = ImageManager(
-                engine=self.engine,
-                device_mqtt=self.device_mqtt,
-                skill_config=self.skill_config,
-                logger=self.logger,
-            )
-
-            # Start automatic image rotation scheduler
-            self.add_task(self._start_rotation_scheduler(), name="image_rotation")
-
-            # Subscribe to device topics
-            await self.device_mqtt.subscribe_device_topics()
-
-            # Start listening for device messages
-            await self._listen_device_mqtt()
-
-    async def _listen_device_mqtt(self) -> None:
-        """Listen for incoming device MQTT messages."""
-        if self.device_mqtt is None:
-            raise RuntimeError("Device MQTT client not initialized")
-
-        async for message in self.device_mqtt.messages():
+    async def _periodic_device_sync(self) -> None:
+        """Background task to periodically sync devices from the API."""
+        while True:
+            await asyncio.sleep(self.device_sync_interval)
             try:
-                await self._handle_device_message(message)
+                await self._sync_devices_from_api()
             except Exception as e:
-                self.logger.error("Error handling device message: %s", e, exc_info=True)
+                self.logger.error("Error in device sync: %s", e, exc_info=True)
 
-    async def _handle_device_message(self, message: aiomqtt.Message) -> None:
-        """Route device MQTT message to appropriate handler.
-
-        Args:
-            message: Incoming MQTT message
-
-        """
-        if self.device_mqtt is None:
-            return
-
-        topic = str(message.topic)
-        payload = self.device_mqtt.decode_payload(message.payload)
-
-        if payload is None:
-            self.logger.warning("Failed to decode device message payload")
-            return
-
-        if topic == self.device_mqtt.REGISTER_TOPIC:
-            await self._handle_registration(payload)
-        elif "/status" in topic:
-            device_id = self.device_mqtt.extract_device_id_from_topic(topic)
-            if device_id:
-                await self._handle_acknowledge(device_id, payload)
-
-    async def _handle_registration(self, payload: dict) -> None:
-        """Handle device registration request.
-
-        Registers device in GlobalDevice registry and creates DeviceDisplayState.
-
-        Args:
-            payload: Registration payload from device
-
-        """
-        if self.device_mqtt is None:
-            self.logger.error("Device MQTT client not initialized")
-            return
-
+    async def _sync_devices_from_api(self) -> None:
+        """Fetch devices from the display API and register/update in GlobalDevice."""
         try:
-            registration = DeviceRegistration.model_validate(payload)
-        except ValidationError as e:
-            self.logger.error("Invalid registration payload: %s", e)
+            api_devices = await self.api_client.get_devices()
+        except (httpx.HTTPStatusError, httpx.TimeoutException) as e:
+            self.logger.error("Failed to fetch devices from API: %s", e)
             return
 
-        # Build device_attributes with display hardware info
-        device_attributes = {
-            "display_width": registration.display.width,
-            "display_height": registration.display.height,
-            "orientation": registration.display.orientation,
-            "model": registration.display.model,
-        }
+        for api_device in api_devices:
+            device_attributes = {
+                "display_width": api_device.display_width,
+                "display_height": api_device.display_height,
+                "orientation": api_device.display_orientation,
+                "model": api_device.display_model,
+                "is_online": api_device.is_online,
+            }
 
-        # Build pattern list for voice command matching
-        patterns = [
-            registration.device_id,
-            f"{registration.device_id} display",
-            f"{registration.device_id} frame",
-        ]
-        if registration.room:
-            patterns.extend(
-                [
-                    f"{registration.room} display",
-                    f"{registration.room} picture frame",
-                    f"display in {registration.room}",
-                ]
-            )
+            patterns = [api_device.device_id]
+            if api_device.room:
+                patterns.extend(
+                    [
+                        f"{api_device.room} display",
+                        f"{api_device.room} picture frame",
+                        f"display in {api_device.room}",
+                    ]
+                )
 
-        # Check if device already exists
-        existing_device = self._find_device_by_name(registration.device_id)
+            existing = self._find_device_by_name(api_device.device_id)
+            if existing:
+                await self._update_device(existing.id, device_attributes, patterns)
+            else:
+                await self.register_device(
+                    device_type="picture_display",
+                    name=api_device.device_id,
+                    pattern=patterns,
+                    room=api_device.room,
+                    device_attributes=device_attributes,
+                )
 
-        if existing_device:
-            # Update existing device
-            global_device_id = await self._update_device(existing_device.id, device_attributes, patterns)
-            status: str = "updated"
-            self.logger.info("Updated device registration: %s", registration.device_id)
-        else:
-            # Register new device in global registry
-            global_device_id = await self.register_device(
-                device_type="picture_display",
-                name=registration.device_id,
-                pattern=patterns,
-                room=registration.room,
-                device_attributes=device_attributes,
-            )
-            status = "registered"
-            self.logger.info("New device registered: %s", registration.device_id)
-
-        # Create/update DeviceDisplayState
-        await self._ensure_display_state(global_device_id)
-
-        # Send registration response with MinIO credentials
-        response = RegistrationResponse(
-            status=status,
-            s3_endpoint=self.s3_config.endpoint,
-            s3_bucket=self.s3_config.bucket,
-            s3_access_key=self.s3_config.reader_access_key,
-            s3_secret_key=self.s3_config.reader_secret_key,
-            s3_secure=self.s3_config.secure,
-            s3_region=self.s3_config.region,
-        )
-        await self.device_mqtt.publish_registered(registration.device_id, response)
+        self.logger.debug("Synced %d devices from API", len(api_devices))
 
     def _find_device_by_name(self, name: str) -> GlobalDevice | None:
         """Find a device in the global_devices cache by name.
@@ -300,65 +193,9 @@ class PictureSkill(BaseSkill):
                 device.pattern = patterns
                 await session.commit()
 
-        # Refresh local device cache
         self.global_devices = await self.get_skill_devices()
 
         return device_id
-
-    async def _ensure_display_state(self, global_device_id: UUID) -> None:
-        """Ensure DeviceDisplayState exists for a device.
-
-        Creates the state record if it doesn't exist, sets is_online=True.
-
-        Args:
-            global_device_id: GlobalDevice UUID
-
-        """
-        async with AsyncSession(self.engine) as session:
-            result = await session.exec(
-                select(DeviceDisplayState).where(DeviceDisplayState.global_device_id == global_device_id)
-            )
-            display_state = result.first()
-
-            if display_state:
-                display_state.is_online = True
-            else:
-                display_state = DeviceDisplayState(
-                    global_device_id=global_device_id,
-                    is_online=True,
-                )
-                session.add(display_state)
-
-            await session.commit()
-
-    async def _handle_acknowledge(self, device_name: str, payload: dict) -> None:
-        """Handle device acknowledgment after display command.
-
-        Args:
-            device_name: Device name from topic
-            payload: Acknowledgment payload from device
-
-        """
-        try:
-            ack = DeviceAcknowledge.model_validate(payload)
-        except ValidationError as e:
-            self.logger.error("Invalid acknowledge payload from %s: %s", device_name, e)
-            return
-
-        # Find device by name
-        device = self._find_device_by_name(device_name)
-        if device is None:
-            self.logger.warning("Acknowledge from unknown device: %s", device_name)
-            return
-
-        if not ack.successful_display_change:
-            self.logger.warning(
-                "Device %s failed to display image: %s",
-                device_name,
-                ack.error or "unknown error",
-            )
-
-        self.logger.debug("Processed acknowledge for device: %s", device_name)
 
     async def process_request(self, intent_request: IntentRequest) -> None:
         """Process voice command intent.
@@ -378,7 +215,7 @@ class PictureSkill(BaseSkill):
                 self.logger.warning("Unhandled intent type: %s", intent_type)
 
     async def _select_devices_for_request(self, intent_request: IntentRequest) -> list[GlobalDevice]:
-        """Select all appropriate devices based on room or explicit naming.
+        """Select appropriate devices based on room or explicit naming.
 
         Priority:
         1. Explicitly named device in entities (single device)
@@ -392,17 +229,14 @@ class PictureSkill(BaseSkill):
             List of matching online GlobalDevices, may be empty
 
         """
-        device: GlobalDevice  # Type annotation for loop variable
+        device: GlobalDevice
 
         # Check for explicit device name in entities
         device_entities = intent_request.classified_intent.entities.get("device", [])
         if device_entities:
             device_name = device_entities[0].normalized_value
-            # Search in global_devices cache for pattern match
             for device in self.global_devices:
-                if device_name.lower() in [p.lower() for p in device.pattern] and await self._is_device_online(
-                    device.id
-                ):
+                if device_name.lower() in [p.lower() for p in device.pattern] and self._is_device_online(device):
                     self.logger.debug("Selected device by name: %s", device.name)
                     return [device]
 
@@ -411,7 +245,7 @@ class PictureSkill(BaseSkill):
         if request_room:
             room_devices: list[GlobalDevice] = []
             for device in self.global_devices:
-                if device.room and device.room.name == request_room and await self._is_device_online(device.id):
+                if device.room and device.room.name == request_room and self._is_device_online(device):
                     room_devices.append(device)
             if room_devices:
                 self.logger.debug(
@@ -424,45 +258,33 @@ class PictureSkill(BaseSkill):
 
         # Fallback: first online device
         for device in self.global_devices:
-            if await self._is_device_online(device.id):
+            if self._is_device_online(device):
                 self.logger.debug("Selected first online device: %s", device.name)
                 return [device]
 
         return []
 
-    async def _is_device_online(self, global_device_id: UUID) -> bool:
-        """Check if a device is online.
+    @staticmethod
+    def _is_device_online(device: GlobalDevice) -> bool:
+        """Check if a device is online based on synced attributes.
 
         Args:
-            global_device_id: GlobalDevice UUID
+            device: GlobalDevice with device_attributes from API sync
 
         Returns:
-            True if device is online, False otherwise
+            True if device is online
 
         """
-        async with AsyncSession(self.engine) as session:
-            result = await session.exec(
-                select(DeviceDisplayState).where(DeviceDisplayState.global_device_id == global_device_id)
-            )
-            display_state = result.first()
-            return display_state is not None and display_state.is_online
+        attrs = device.device_attributes or {}
+        return attrs.get("is_online", False)
 
     async def _handle_media_next(self, intent_request: IntentRequest) -> None:
         """Handle 'next picture' command.
-
-        Refreshes all matching devices (e.g. all devices in a room).
 
         Args:
             intent_request: Intent request with client info
 
         """
-        if self.image_manager is None:
-            await self.send_response(
-                "Picture display service is not ready. Please try again later.",
-                intent_request.client_request,
-            )
-            return
-
         devices = await self._select_devices_for_request(intent_request)
         if not devices:
             await self.send_response(
@@ -471,14 +293,18 @@ class PictureSkill(BaseSkill):
             )
             return
 
-        last_image = None
+        last_image: ImageInfo | None = None
         for device in devices:
-            image = await self.image_manager.get_next_image_for_device(device)
-            if image is None:
-                self.logger.warning("No images available for device %s", device.name)
+            try:
+                image = await self.api_client.next_image(device.name)
+            except (httpx.HTTPStatusError, httpx.TimeoutException) as e:
+                self.logger.error("API error advancing image on %s: %s", device.name, e)
                 continue
-            await self.image_manager.send_display_command(device, image)
-            last_image = image
+
+            if image is not None:
+                last_image = image
+            else:
+                self.logger.warning("No images available for device %s", device.name)
 
         if last_image is None:
             await self.send_response(
@@ -487,7 +313,6 @@ class PictureSkill(BaseSkill):
             )
             return
 
-        # Send voice response based on the last displayed image
         template = self.template_env.get_template("next_picture.j2")
         response_text = template.render(image=last_image)
         await self.send_response(response_text, intent_request.client_request)
@@ -499,14 +324,6 @@ class PictureSkill(BaseSkill):
             intent_request: Intent request with client info
 
         """
-        if self.image_manager is None:
-            await self.send_response(
-                "Picture display service is not ready.",
-                intent_request.client_request,
-            )
-            return
-
-        # Select device using room-based or explicit naming
         devices = await self._select_devices_for_request(intent_request)
         if not devices:
             await self.send_response(
@@ -516,8 +333,33 @@ class PictureSkill(BaseSkill):
             return
         device = devices[0]
 
-        # Get current image
-        image = await self.image_manager.get_current_image_for_device(device.id)
+        try:
+            api_device = await self.api_client.get_device(device.name)
+        except (httpx.HTTPStatusError, httpx.TimeoutException) as e:
+            self.logger.error("API error fetching device %s: %s", device.name, e)
+            await self.send_response(
+                "Picture display service is temporarily unavailable.",
+                intent_request.client_request,
+            )
+            return
+
+        if api_device is None or api_device.current_image_id is None:
+            await self.send_response(
+                "No image is currently being displayed.",
+                intent_request.client_request,
+            )
+            return
+
+        try:
+            image = await self.api_client.get_image(api_device.current_image_id)
+        except (httpx.HTTPStatusError, httpx.TimeoutException) as e:
+            self.logger.error("API error fetching image: %s", e)
+            await self.send_response(
+                "Picture display service is temporarily unavailable.",
+                intent_request.client_request,
+            )
+            return
+
         if image is None:
             await self.send_response(
                 "No image is currently being displayed.",
@@ -525,72 +367,6 @@ class PictureSkill(BaseSkill):
             )
             return
 
-        # Send voice response with image description
         template = self.template_env.get_template("describe_image.j2")
         response_text = template.render(image=image)
         await self.send_response(response_text, intent_request.client_request)
-
-    async def _start_rotation_scheduler(self) -> None:
-        """Background task for automatic image rotation.
-
-        Periodically checks for devices where scheduled_next_at has passed
-        and rotates to the next image.
-        """
-        while True:
-            await asyncio.sleep(self.rotation_check_interval)
-
-            if self.image_manager is None:
-                continue
-
-            try:
-                await self._rotate_due_devices()
-            except Exception as e:
-                self.logger.error("Error in rotation scheduler: %s", e, exc_info=True)
-
-    async def _rotate_due_devices(self) -> None:
-        """Find and rotate images on devices past their scheduled time."""
-        now = datetime.now()
-
-        async with AsyncSession(self.engine) as session:
-            # Find online devices due for rotation
-            query = (
-                select(DeviceDisplayState)
-                .where(DeviceDisplayState.is_online == True)  # noqa: E712
-                .where(DeviceDisplayState.scheduled_next_at <= now)
-            )
-            result = await session.exec(query)
-            due_states = result.all()
-
-        for state in due_states:
-            await self._rotate_single_device(state.global_device_id)
-
-    async def _rotate_single_device(self, global_device_id: UUID) -> None:
-        """Rotate image on a single device.
-
-        Args:
-            global_device_id: UUID of the GlobalDevice to rotate
-
-        """
-        if self.image_manager is None:
-            return
-
-        # Find the GlobalDevice from cache
-        device: GlobalDevice | None = None
-        for d in self.global_devices:
-            if d.id == global_device_id:
-                device = d
-                break
-
-        if device is None:
-            self.logger.warning("Device %s not found in cache for rotation", global_device_id)
-            return
-
-        # Get next image
-        image = await self.image_manager.get_next_image_for_device(device)
-        if image is None:
-            self.logger.debug("No images available for device %s", device.name)
-            return
-
-        # Send display command (this updates scheduled_next_at)
-        await self.image_manager.send_display_command(device, image)
-        self.logger.info("Auto-rotated to image '%s' on %s", image.title or image.id, device.name)

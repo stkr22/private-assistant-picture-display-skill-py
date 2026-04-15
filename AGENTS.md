@@ -5,13 +5,25 @@
 When uncertain about implementation details or requirements, ask for clarification before proceeding.
 Break down the task at hand and chalk out a rough plan for carrying it out, referencing project conventions and best practices.
 
+## Project Structure
+
+Single Python package: `private-assistant-picture-display-skill` (module: `private_assistant_picture_display_skill`).
+Voice-controlled picture display skill for Inky e-ink devices using `private-assistant-commons`.
+Delegates device and image management to the display API over HTTP.
+
+```
+src/private_assistant_picture_display_skill/    # Source code
+tests/                        # Unit tests
+integration/                  # Integration tests (require PostgreSQL, MQTT, display API)
+```
+
 ## Core Commands
 
 Add a dependency
 ```bash
 uv add pydantic~=2.9.0
 ```
-Install dependencies
+Install all dependencies
 ```bash
 uv sync --group dev
 ```
@@ -21,7 +33,7 @@ uv run pytest
 ```
 Apply formatting and Check code quality and Validate types. Always run after the end of a task.
 ```bash
-uv run ruff check --fix . && uv run ruff format . && uv run mypy .
+uv run ruff check --fix . && uv run ruff format . && uv run ty check
 ```
 
 ## Code Documentation

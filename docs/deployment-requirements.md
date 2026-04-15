@@ -21,25 +21,12 @@ Requirements for deploying the Picture Display Skill to Kubernetes via ArgoCD.
 | `MQTT_HOST` | MQTT broker hostname | `mosquitto.messaging.svc` |
 | `MQTT_PORT` | MQTT broker port | `1883` |
 
-### Device MQTT (for Inky display communication)
-
-Uses the same MQTT broker as the internal communication.
+### Display API
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DEVICE_MQTT_HOST` | Device MQTT broker hostname | `mosquitto.messaging.svc` |
-| `DEVICE_MQTT_PORT` | Device MQTT broker port | `1883` |
-| `DEVICE_MQTT_USERNAME` | Device MQTT username | (optional, from secret) |
-| `DEVICE_MQTT_PASSWORD` | Device MQTT password | (optional, from secret) |
-
-### S3-Compatible Storage (Image Storage)
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `S3_ENDPOINT` | S3 endpoint (host:port) | `garage.storage.svc:3900` |
-| `S3_BUCKET` | Bucket name for images | `inky-images` |
-| `S3_READER_ACCESS_KEY` | Read-only access key | (from secret) |
-| `S3_READER_SECRET_KEY` | Read-only secret key | (from secret) |
+| `DISPLAY_API_BASE_URL` | Display API base URL | `http://picture-display-api.apps.svc:8000` |
+| `DISPLAY_API_TIMEOUT` | HTTP request timeout (seconds) | `10.0` |
 
 ## Required Secrets
 
@@ -56,33 +43,17 @@ stringData:
   POSTGRES_PASSWORD: <password>
 ```
 
-### S3 Credentials
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: picture-skill-s3
-type: Opaque
-stringData:
-  S3_READER_ACCESS_KEY: <access-key>
-  S3_READER_SECRET_KEY: <secret-key>
-```
-
 ## External Dependencies
-
-### S3 Bucket
-
-Create bucket `inky-images` with:
-- Reader policy for skill to serve image URLs to devices
-- Writer policy for external image ingest (future agents)
 
 ### Database Tables
 
-Tables are auto-created by SQLModel on startup:
-- `images` - Image metadata and storage paths
-- `picture_devices` - Registered Inky display devices
-- `device_display_states` - Current display state per device
+The skill uses `global_devices` and related tables managed by `private-assistant-commons`.
+Device and image tables are managed by the display API.
+
+### Display API
+
+The skill requires a running [picture-display-api](https://github.com/stkr22/private-assistant-picture-display-api) instance.
+The API manages devices, images, and display rotation.
 
 ## Deployment Manifest
 
@@ -104,25 +75,17 @@ spec:
       containers:
         - name: skill
           image: ghcr.io/stkr22/private-assistant-picture-display-skill:latest
-          command: ["private-assistant-picture-display-skill", "run"]
+          command: ["private-assistant-picture-display-skill", "main"]
           envFrom:
             - secretRef:
                 name: picture-skill-db
-            - secretRef:
-                name: picture-skill-s3
           env:
             - name: MQTT_HOST
               value: mosquitto.messaging.svc
             - name: MQTT_PORT
               value: "1883"
-            - name: DEVICE_MQTT_HOST
-              value: mosquitto.messaging.svc
-            - name: DEVICE_MQTT_PORT
-              value: "1883"
-            - name: S3_ENDPOINT
-              value: garage.storage.svc:3900
-            - name: S3_BUCKET
-              value: inky-images
+            - name: DISPLAY_API_BASE_URL
+              value: http://picture-display-api.apps.svc:8000
             - name: POSTGRES_HOST
               value: cnpg-cluster-rw.database.svc
             - name: POSTGRES_PORT
@@ -148,10 +111,3 @@ spec:
 
 - `assistant/skill/register` - Skill registration on startup
 - `{client_output_topic}` - Responses to voice commands
-
-### Device Topics
-
-- Subscribe: `inky/register` - Device registration requests
-- Subscribe: `inky/+/status` - Device status heartbeats
-- Publish: `inky/{device_id}/command` - Display commands
-- Publish: `inky/{device_id}/registered` - Registration confirmations
