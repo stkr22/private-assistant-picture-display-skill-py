@@ -22,7 +22,7 @@ jobs:
           python-version-file: "pyproject.toml"
 
       - name: Install the project
-        run: uv sync --all-extras --dev
+        run: uv sync --all-packages --all-extras --dev
 
       - name: Run Ruff
         run: uv run ruff check --output-format=github .
@@ -42,7 +42,7 @@ jobs:
           python-version-file: "pyproject.toml"
 
       - name: Install the project
-        run: uv sync --all-extras --dev
+        run: uv sync --all-packages --all-extras --dev
 
       - name: Run ty (Type Checker)
         run: uv run ty check
@@ -66,8 +66,8 @@ jobs:
           python-version-file: "pyproject.toml"
 
       - name: Install the project
-        run: uv sync --all-extras --dev
+        run: uv sync --all-packages --all-extras --dev
 
       - name: Run Pytest
         run: |
-          uv run pytest tests -m "not integration" --doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
+          uv run pytest -m "not integration" --junitxml=junit/test-results.xml

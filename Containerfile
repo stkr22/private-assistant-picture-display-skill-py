@@ -12,14 +12,14 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.17@sha256:5cb6b54d2bc3fe2eb9a8483db958a0b9e
 # Set working directory
 WORKDIR /app
 
-# Copy dependencies and pre-built wheel
-COPY dist/*.whl /app/dist/
+# Copy project files needed for dependency resolution
+COPY pyproject.toml uv.lock ./
+COPY src/ src/
 
 RUN --mount=type=cache,target=/root/.cache \
-    uv venv && \
-    uv pip install dist/*.whl
+    uv sync --no-dev --no-editable
 
-# runtime stage: Python 3.13.9-slim-trixie
+# Runtime stage: Python 3.13.9-slim-trixie
 FROM docker.io/library/python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
 
 ENV PYTHONUNBUFFERED=1
@@ -28,11 +28,9 @@ ENV PYTHONUNBUFFERED=1
 RUN addgroup --system --gid 1001 appuser && adduser --system --uid 1001 --no-create-home --ingroup appuser appuser
 
 WORKDIR /app
-COPY --from=build-python /app /app
+COPY --from=build-python /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
-# Set the user to 'appuser'
 USER appuser
 
 ENTRYPOINT ["private-assistant-picture-display-skill"]
-CMD ["main"]

@@ -39,6 +39,7 @@
 				"python.defaultInterpreterPath": "/workspaces/.venv/bin/python",
 				"python.testing.unittestEnabled": false,
 				"python.testing.pytestEnabled": true,
+				"python.languageServer": "None", // needed for ty
 				"cSpell.files": [
 					"src"
 				]
