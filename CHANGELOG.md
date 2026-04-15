@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.13.1...v0.14.0) (2026-04-15)
+
+
+### Features
+
+* :recycle: delegate device and image management to display API ([e0eb234](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/e0eb234eceba8e5e4b07013bec9f71434f25a09f))
+* :recycle: delegate device and image management to display API ([5dd016f](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/5dd016fe03b5898431f354339606b6fac2063034))
+
+
+### Bug Fixes
+
+* :wrench: restore single-package CI workflows from monorepo matrix ([891fbb5](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/891fbb594c9326daa57b5cd40eced03e36e7d59d))
+
 ## [0.13.1](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.13.0...v0.13.1) (2026-04-11)
 
 
