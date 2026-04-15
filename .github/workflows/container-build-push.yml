@@ -7,21 +7,6 @@ on:
 jobs:
   push:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service:
-          - name: skill
-            file: packages/skill/Containerfile
-            image: ghcr.io/${{ github.repository }}-skill
-          - name: sync
-            file: packages/sync/Containerfile
-            image: ghcr.io/${{ github.repository }}-sync
-          - name: api
-            file: packages/api/Containerfile
-            image: ghcr.io/${{ github.repository }}-api
-          - name: controller
-            file: packages/controller/Containerfile
-            image: ghcr.io/${{ github.repository }}-controller
 
     permissions:
       packages: write
@@ -44,16 +29,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push ${{ matrix.service.name }}
+      - name: Build and Push
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: .
-          file: ${{ matrix.service.file }}
+          file: Containerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ matrix.service.image }}:latest
-            ${{ matrix.service.image }}:${{ github.sha }}
-            ${{ matrix.service.image }}:${{ env.VERSION }}
-          cache-from: type=gha,scope=${{ matrix.service.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:${{ env.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
