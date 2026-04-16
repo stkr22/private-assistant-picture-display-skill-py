@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "private-assistant-picture-display-skill"
-version = "0.14.0"
+version = "0.14.1"
 description = "Voice-controlled picture display skill for Inky e-ink devices."
 authors = [
     { name = "stkr22", email = "stkr22@github.com" }
