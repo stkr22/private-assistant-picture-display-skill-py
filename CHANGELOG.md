@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.1](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.14.0...v0.14.1) (2026-04-16)
+
+
+### Bug Fixes
+
+* :wrench: copy README.md and LICENSE into build stage ([d730110](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/d7301109728afb194d06f991a4788f52edb45f6a))
+* :wrench: copy README.md and LICENSE into build stage ([231ecd3](https://github.com/stkr22/private-assistant-picture-display-skill-py/commit/231ecd37f81a8b0dd28e14373d52dbd23d4ccd8c))
+
 ## [0.14.0](https://github.com/stkr22/private-assistant-picture-display-skill-py/compare/v0.13.1...v0.14.0) (2026-04-15)
 
 
