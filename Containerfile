@@ -13,7 +13,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.17@sha256:5cb6b54d2bc3fe2eb9a8483db958a0b9e
 WORKDIR /app
 
 # Copy project files needed for dependency resolution
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src/ src/
 
 RUN --mount=type=cache,target=/root/.cache \
